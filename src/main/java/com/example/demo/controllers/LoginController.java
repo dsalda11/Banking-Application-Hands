@@ -3,6 +3,8 @@ package com.example.demo.controllers;
 import java.io.IOException;
 
 import javax.mail.MessagingException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -15,8 +17,6 @@ import com.example.demo.service.Mailservice;
 
 @Controller
 public class LoginController {
-	
-	public static String uname;
 	@Autowired
 	LoginService loginService;
 	
@@ -30,12 +30,19 @@ public class LoginController {
 	
 	@RequestMapping("/validatelogin")
 	public String dashboard(@RequestParam String username,@RequestParam String password,
-			ModelMap model)throws MessagingException, IOException{
+			ModelMap model, HttpServletRequest request)throws MessagingException, IOException{
 		model.put("username",username);
-		uname=username;
-		if (loginService.isValid(username,password)) {
-			mailService.sendEmail();
-			return "home";
+		String role = loginService.getRole(username, password);
+		if (role != null) {
+			HttpSession oldSession = request.getSession(false);
+			if (oldSession != null) {
+				oldSession.invalidate();
+			}
+			HttpSession session = request.getSession(true);
+			session.setAttribute("username", username);
+			session.setAttribute("role", role);
+			mailService.sendEmail(username);
+			return ("admin".equals(role) || "emp".equals(role)) ? "redirect:/staff" : "home";
 		}
 		return "login";
 	}

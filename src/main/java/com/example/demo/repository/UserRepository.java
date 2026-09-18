@@ -57,14 +57,16 @@ public class UserRepository {
 
  public boolean search(String username, String password)
  {
-	 String query="select userid from logindata where userid='"+username+"' and password='"+password+"';";
-	 List<String> userNameList = new ArrayList<>();
-	 userNameList=jdbcTemplate.queryForList(query,String.class);
-	 if(userNameList.size()==1)
-		 return true;
-	 else
-		 return false;
- }
+	 return getRole(username, password) != null;
+	}
+
+	public String getRole(String username, String password) {
+		List<String> roles = jdbcTemplate.query(
+				"select `Role` from logindata where userid=? and password=?",
+				new Object[] { username, password },
+				(rs, rowNum) -> rs.getString("Role"));
+		return roles.isEmpty() ? null : roles.get(0);
+	}
  public String getDate() {
 	 Date date= new Date();
 	 long time = date.getTime();
@@ -74,7 +76,7 @@ public class UserRepository {
  
 public int transfer(String source, String dest,String date, int amount) {
 	System.out.println("--"+source+"--"+dest+"--"+date+"--"+amount+"--");
-	jdbcTemplate.update("insert into transaction values(?,?,?,?);",source,dest,date,amount);
+	jdbcTemplate.update("insert into `transaction` values(?,?,?,?);",source,dest,date,amount);
 	int samt=jdbcTemplate.queryForObject("select balance from userdata where email=\""+source+"\";",Integer.class);
 	int damt=jdbcTemplate.queryForObject("select balance from userdata where email=\""+dest+"\";",Integer.class);
 	if(samt-amount>0) {
@@ -91,7 +93,7 @@ public int transfer(String source, String dest,String date, int amount) {
 
 public int addadmin(String source, String dest,String date, int amount) {
 	System.out.println("--"+source+"--"+dest+"--"+date+"--"+amount+"--");
-	jdbcTemplate.update("insert into transaction values(?,?,?,?);",source,dest,date,amount);
+	jdbcTemplate.update("insert into `transaction` values(?,?,?,?);",source,dest,date,amount);
 	int samt=jdbcTemplate.queryForObject("select balance from userdata where email=\""+source+"\";",Integer.class);
 	int damt=jdbcTemplate.queryForObject("select balance from userdata where email=\""+dest+"\";",Integer.class);
 	if(samt-amount>0) {
@@ -116,7 +118,7 @@ public int addAdmin(String name, String username, String accno, int mobno, Strin
 	System.out.println("----- "+s+"----- ");
 	return s;
 }
-public int addAdminLogin(String username, String password, String role) {
+	public int addAdminLogin(String username, String password, String role) {
 	
 	int s=jdbcTemplate.update("insert into logindata values(?,?,?);",username,password,role);
 	System.out.println("----- "+s+"----- ");

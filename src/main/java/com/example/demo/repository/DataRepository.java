@@ -23,7 +23,7 @@ public class DataRepository {
  
  public List<Transaction> showTransaction(String username) {
 	 List<Transaction> transaction = new ArrayList<Transaction>() ;
-	 transaction.addAll(jdbcTemplate.query("select * from transaction where `from`='"+username+"';", 
+	 transaction.addAll(jdbcTemplate.query("select * from `transaction` where `from`='"+username+"';",
 			 (rs, rowNum) ->
      			new Transaction(
              rs.getString("from"),
@@ -54,6 +54,21 @@ public List<User> getAll(String role) {
 	             rs.getLong("balance"))));
 	}
 	 return user;
+}
+
+public List<User> getCustomers(String username) {
+	String sql = "select u.* from userdata u join logindata l on l.userid=u.email "
+			+ "where l.`Role`='cust'";
+	if (username != null && !username.trim().isEmpty()) {
+		sql += " and l.userid=?";
+		return jdbcTemplate.query(sql, new Object[] { username.trim() }, this::mapUser);
+	}
+	return jdbcTemplate.query(sql, this::mapUser);
+}
+
+private User mapUser(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+	return new User(rs.getString("name"), rs.getString("email"), rs.getString("accno"),
+			rs.getLong("Mobno"), rs.getString("address"), rs.getLong("ifsc"), rs.getLong("balance"));
 }
 
 }

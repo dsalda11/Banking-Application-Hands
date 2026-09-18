@@ -27,4 +27,8 @@ public class CheckProfile {
 		
 		return dataRepository.getAll(role);
 	}
+
+	public List<User> getCustomers(String username) {
+		return dataRepository.getCustomers(username);
+	}
 }

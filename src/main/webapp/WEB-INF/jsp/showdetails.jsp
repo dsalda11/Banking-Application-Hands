@@ -2,12 +2,17 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
 <div id="container">
 <link href="css.css" rel="stylesheet" type="text/css">
-<jsp:include page="home-header.jsp"></jsp:include>
+<c:choose>
+    <c:when test="${role == 'cust'}"><jsp:include page="home-header.jsp"></jsp:include></c:when>
+    <c:otherwise><jsp:include page="staff-header.jsp"></jsp:include></c:otherwise>
+</c:choose>
 
 <div id="content-container">
 <div id="content"><center>
 <marquee><h2 style="color: red;"><i>--- Welcome ${username} ---</i></h2></marquee><br/><br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+<c:if test="${notFound}"><p style="color: red;"><b>Customer not found.</b></p></c:if>
 
 <table cellpadding="10" border="1">
 <c:forEach items="${user}" var="user">

@@ -1,7 +1,7 @@
 
 
 <div id="header">
-<img src="images/logo.jpg"/>
+<div class="bank-logo">THE ABC BANK</div>
 </div>
 
 <div id="navigation">
@@ -13,6 +13,7 @@
     <li><a href="addadmin">Add Admin</a></li>
     <li><a href="addemp">Add Employee</a></li>
     <li><a href="addcust">Add Customer</a></li>
+    <li><a href="showcust">Customers</a></li>
     <li><a href="getDetails?username=${username}">View Account</a></li>
   
         <li> <a href="logout">Logout</a></li>

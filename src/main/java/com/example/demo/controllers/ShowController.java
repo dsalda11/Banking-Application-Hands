@@ -40,9 +40,4 @@ ShowService showService;
 	return "showemp";
  }
  
- @GetMapping(path="/showcust")
- public String showCust(ModelMap model) {
-	 model.put("allcust",checkProfile.getAll("cust"));
-	return "showcust";
- }
 }

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.example.demo.repository.UserRepository;
@@ -41,11 +43,20 @@ ShowService showService;
  }
 
  @GetMapping(path="/getDetails")
- public String showDetails(@RequestParam String username,ModelMap model) {
+ public String showDetails(@RequestParam String username,ModelMap model, HttpServletRequest request) {
+	 HttpSession session = request.getSession(false);
+	 String role = session == null ? null : (String) session.getAttribute("role");
+	 String currentUser = session == null ? null : (String) session.getAttribute("username");
+	 if ("cust".equals(role) && !currentUser.equals(username)) {
+		 return "redirect:/home";
+	 }
 	 System.out.println("------ ----------------------------"+username+"-------");
 	 model.put("user",checkProfile.getDetails(username));
+	 model.put("username", currentUser);
+	 model.put("role", role);
+	 model.put("notFound", checkProfile.getDetails(username).isEmpty());
 	 System.out.println(checkProfile.getDetails(username).toString());
-	return "showdetails";
+	 return "showdetails";
  }
  
  @GetMapping(path="/transfermoney")
@@ -55,9 +66,9 @@ ShowService showService;
 
  @PostMapping(path="/"
  		+ "transfermoney")
- public String transferMoney(@RequestParam String username,@RequestParam int amount,@RequestParam String user,ModelMap model, RedirectAttributes redirAttrs) {
-	 System.out.println("##########"+LoginController.uname+"######");
-	 int s=transferService.transfer(LoginController.uname,user,amount);
+ public String transferMoney(@RequestParam String username,@RequestParam int amount,@RequestParam String user,ModelMap model, RedirectAttributes redirAttrs, HttpSession session) {
+	 String currentUser = (String) session.getAttribute("username");
+	 int s=transferService.transfer(currentUser,user,amount);
 	 if(s==0)
 	 {
 		 redirAttrs.addFlashAttribute("message", "Transaction Unsuccessful");
@@ -121,15 +132,17 @@ ShowService showService;
  }
  
  @GetMapping(path="/showtransaction")
- public String showTransaction(ModelMap model) {
-	 model.put("transaction",showService.showTransaction(LoginController.uname));
+ public String showTransaction(ModelMap model, HttpSession session) {
+	 model.put("transaction",showService.showTransaction((String) session.getAttribute("username")));
 	return "showtransaction";
  }
  
  @GetMapping(path="/logout")
- public String showLogout() {
-	 System.out.println(LoginController.uname);
-	 LoginController.uname="";
+ public String showLogout(HttpServletRequest request) {
+	 HttpSession session = request.getSession(false);
+	 if (session != null) {
+		 session.invalidate();
+	 }
 	return "logout";
  }
 }

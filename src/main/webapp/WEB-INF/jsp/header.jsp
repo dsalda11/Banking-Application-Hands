@@ -1,7 +1,7 @@
 
 
 <div id="header">
-<img src="images/logo.jpg"/>
+<div class="bank-logo">THE ABC BANK</div>
 
 </div>
 

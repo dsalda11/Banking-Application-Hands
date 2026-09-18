@@ -15,8 +15,10 @@ public class LoginService {
 	
 	
 	public boolean isValid(String username, String password) {
-		
 		return userRepository.search(username,password);
-		
+	}
+
+	public String getRole(String username, String password) {
+		return userRepository.getRole(username, password);
 	}
 }

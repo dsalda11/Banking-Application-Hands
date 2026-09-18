@@ -8,7 +8,6 @@
 </head>
 <body>
 
-	<img src="images/logo.png"/>
-	<img src="images/logo.jpg"/>
+	<div class="bank-logo">THE ABC BANK</div>
 </body>
 </html>
