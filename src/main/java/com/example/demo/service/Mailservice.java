@@ -6,19 +6,22 @@ import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import com.example.demo.controllers.LoginController;
 
 @Service
 public class Mailservice {
 	
 	@Autowired
     private JavaMailSender javaMailSender;
+
+	@Value("${app.mail.enabled:false}")
+	private boolean mailEnabled;
 /*
 	@Override
     public void run(String... args) throws MessagingException, IOException {
@@ -32,10 +35,13 @@ public class Mailservice {
 
     }
 */
-    public void sendEmail() {
+    public void sendEmail(String username) {
+		if (!mailEnabled) {
+			return;
+		}
 
         SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(LoginController.uname);
+        msg.setTo(username);
 
         msg.setSubject("LOGIN ALERT");
         msg.setText("This is to inform you that Your Account has been Login\n"

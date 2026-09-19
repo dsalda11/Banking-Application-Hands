@@ -1,0 +1,50 @@
+services:
+  db:
+    image: mysql:8.0.36
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-database}
+      MYSQL_USER: ${MYSQL_USER:-bankapp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bankapp_local}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local}
+    volumes:
+      - banking-mysql-data:/var/lib/mysql
+      - ./database/database.sql:/docker-entrypoint-initdb.d/01-database.sql:ro
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-database}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-bankapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-bankapp_local}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/index >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+networks:
+  banking-network:
+    driver: bridge
+
+volumes:
+  banking-mysql-data:

@@ -1,89 +1,45 @@
 # Banking Application Software
 
-[![Stars](https://img.shields.io/github/stars/harivilasp/Banking-Application-Software?style=flat-square)](https://github.com/harivilasp/Banking-Application-Software/stargazers)
-[![Forks](https://img.shields.io/github/forks/harivilasp/Banking-Application-Software?style=flat-square)](https://github.com/harivilasp/Banking-Application-Software/network)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-![Java](https://img.shields.io/badge/Java-Spring_Boot-6DB33F?style=flat-square&logo=springboot&logoColor=white)
-![MySQL](https://img.shields.io/badge/Database-MySQL-4479A1?style=flat-square&logo=mysql&logoColor=white)
+An intentionally insecure Spring Boot/JSP/MySQL banking demonstration app using fake data. Keep it local; do not use real credentials or deploy it publicly.
 
-A secure, full-featured banking application built with Spring Boot. Follows layered MVC architecture with role-based access control for staff and administrators, email notifications for key transactions, and MySQL-backed persistence.
+## Start
 
-## Features
+Requires Docker Desktop and Compose v2.
 
-- **Account Management** — create, update, and delete customer accounts
-- **Transactions** — deposits, withdrawals, balance inquiries
-- **Role-Based Access** — separate staff and admin privilege levels
-- **Email Notifications** — triggered on login and fund transfers
-- **Report Generation** — printable transaction and account reports
-- **Network Database** — single shared MySQL instance across multiple system nodes
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | HTML5, Bootstrap |
-| Backend | Java, Spring Boot |
-| Database | MySQL |
-| Architecture | MVC + Layered Architecture |
-| Server | Embedded Apache Tomcat |
-
-## Getting Started
-
-### Prerequisites
-
-- Java 8+
-- Maven
-- MySQL Workbench or CLI
-- IDE with Spring Boot support (IntelliJ IDEA / Eclipse / NetBeans)
-
-### Database Setup
-
-1. Open MySQL Workbench
-2. Create a database named `database`
-3. Import the SQL file: **Server → Data Import → Import from Self-Contained File** → select the `.sql` file in the repo → Execute
-
-### Application Configuration
-
-Open `src/main/resources/application.properties` and set:
-
-```properties
-# Database
-spring.datasource.username=YOUR_DB_USERNAME
-spring.datasource.password=YOUR_DB_PASSWORD
-
-# Email notifications
-spring.mail.username=${SPRING_MAIL_USERNAME:}
-spring.mail.password=${SPRING_MAIL_PASSWORD:}
+```bash
+cp .env.example .env   # first time only
+docker compose up --build -d
 ```
 
-### Run
+Open <http://127.0.0.1:8080/index> and log in with:
 
-1. Clone the repo and open in your IDE
-2. Import as a Maven project (dependencies download automatically)
-3. Run as **Spring Boot Application**
-4. Open `http://localhost:8080`
-
-### Default Credentials
-
-| Username | Password |
-|----------|----------|
-| `admin` | `admin` |
-
-## Architecture
-
-This project follows a **Layered (n-tier) Architecture**:
-
-```
-Controller (MVC)  →  Service Layer  →  Repository (JPA)  →  MySQL
-                           ↓
-                    Security Layer (role-based auth)
+```text
+Username: admin
+Password: admin
 ```
 
-- **Controller** — handles HTTP requests and routes to views
-- **Service** — business logic (transaction validation, notification dispatch)
-- **Repository** — Spring Data JPA for database operations
-- **Security** — Spring Security with role separation (STAFF / ADMIN)
+The app is built from source as an executable WAR. MySQL runs in a separate healthy container, initializes from `database/database.sql`, and persists in a named Docker volume. Only the app is published on `127.0.0.1`; MySQL is not exposed to the host. Email is disabled by default.
+
+## Commands
+
+```bash
+docker compose ps
+docker compose logs --no-color
+docker compose stop
+docker compose down
+docker compose up --build -d
+```
+
+Reset the fake database:
+
+```bash
+docker compose down
+docker volume rm banking-application-software_banking-mysql-data
+docker compose up --build -d
+```
+
+For a port conflict, set `APP_PORT=8081` in `.env`. For startup or JSP problems, check `docker compose logs --no-color app`; for database initialization problems, check `docker compose logs --no-color db`. SQL initialization runs only when the database volume is new.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for the original license and attribution.
