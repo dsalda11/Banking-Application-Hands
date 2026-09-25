@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interface.ai/schemas/capability-artifact.schema.json",
+  "title": "capability-artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "version",
+    "lifecycle",
+    "name",
+    "description",
+    "target",
+    "contract",
+    "policyRef",
+    "preconditions",
+    "steps",
+    "success",
+    "metadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "lifecycle": { "enum": ["draft", "validated", "approved", "deprecated"] },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "product", "entryPoint", "fingerprints"],
+      "properties": {
+        "surface": { "enum": ["web", "desktop"] },
+        "product": { "type": "string" },
+        "entryPoint": { "type": "object" },
+        "fingerprints": { "type": "array", "minItems": 1 }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs", "requiredSecrets", "outputs", "businessOutcomes"],
+      "properties": {
+        "inputs": { "type": "object" },
+        "requiredSecrets": { "type": "array" },
+        "outputs": { "type": "object" },
+        "businessOutcomes": { "type": "array" }
+      }
+    },
+    "policyRef": { "type": "string" },
+    "preconditions": { "type": "array" },
+    "steps": { "type": "array", "minItems": 1, "maxItems": 100 },
+    "success": { "type": "object" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["createdAt", "provenance"],
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "provenance": { "type": "object" },
+        "compilerVersion": { "type": "string" },
+        "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

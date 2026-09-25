@@ -1,0 +1,50 @@
+{
+  "name": "llm-hands-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  },
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "doctor": "tsx src/cli/index.ts doctor",
+    "surface:smoke": "tsx src/cli/index.ts surface-smoke",
+    "proof:bank": "tsx src/cli/index.ts proof-bank",
+    "artifact:list": "tsx src/cli/index.ts artifact:list",
+    "artifact:validate": "tsx src/cli/index.ts artifact:validate",
+    "replay": "tsx src/cli/index.ts replay",
+    "browser:install": "playwright install chromium",
+    "build": "npx --no-install tsc -p tsconfig.build.json",
+    "start": "node dist/cli/index.js",
+    "schema:generate": "tsx src/domain/generate-schemas.ts",
+    "schema:check": "tsx src/domain/generate-schemas.ts --check",
+    "typecheck": "npx --no-install tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:surface": "vitest run --config vitest.surface.config.ts",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run schema:check && npm run build"
+  },
+  "dependencies": {
+    "commander": "15.0.0",
+    "dotenv": "18.0.0",
+    "fastify": "5.12.5",
+    "openai": "7.18.0",
+    "pino": "10.3.1",
+    "playwright": "1.63.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "^24.13.5",
+    "eslint": "10.10.0",
+    "prettier": "3.9.8",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interface.ai/schemas/discovery-decision.schema.json",
+  "title": "discovery-decision",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reason", "action"],
+      "properties": {
+        "kind": { "const": "action" },
+        "reason": { "type": "string" },
+        "action": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "summary", "candidateOutputs", "successEvidence"],
+      "properties": {
+        "kind": { "const": "complete" },
+        "summary": { "type": "string" },
+        "candidateOutputs": { "type": "object" },
+        "successEvidence": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reasonCode", "explanation", "currentStateSummary"],
+      "properties": {
+        "kind": { "const": "requestHuman" },
+        "reasonCode": { "type": "string" },
+        "explanation": { "type": "string" },
+        "currentStateSummary": { "type": "string" }
+      }
+    }
+  ]
+}
