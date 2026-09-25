@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interface.ai/schemas/discovery-event.schema.json",
+  "title": "discovery-event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "runId",
+    "sequence",
+    "timestamp",
+    "eventType",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "eventId": { "type": "string" },
+    "runId": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "eventType": { "type": "string" },
+    "payload": { "type": "object" }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "success" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "outputs": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/__schema0" },
+          "additionalProperties": { "$ref": "#/$defs/__schema6" }
+        }
+      },
+      "required": [
+        "status",
+        "runId",
+        "evidence",
+        "completedAt",
+        "artifactId",
+        "artifactVersion",
+        "outputs"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "businessOutcome" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "code": { "$ref": "#/$defs/__schema0" },
+        "details": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/__schema0" },
+          "additionalProperties": { "$ref": "#/$defs/__schema6" }
+        }
+      },
+      "required": [
+        "status",
+        "runId",
+        "evidence",
+        "completedAt",
+        "artifactId",
+        "artifactVersion",
+        "code"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "needsHuman" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "interventionId": { "$ref": "#/$defs/__schema0" },
+        "currentStepId": { "$ref": "#/$defs/__schema0" },
+        "reasonCode": { "$ref": "#/$defs/__schema0" },
+        "evidence": { "maxItems": 32, "type": "array", "items": { "$ref": "#/$defs/__schema3" } }
+      },
+      "required": ["status", "runId", "interventionId", "currentStepId", "reasonCode", "evidence"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "failure" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "error": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "schema",
+                "policy",
+                "target",
+                "timeout",
+                "session",
+                "permission",
+                "checkpoint",
+                "application",
+                "internal"
+              ]
+            },
+            "code": { "$ref": "#/$defs/__schema0" },
+            "message": { "$ref": "#/$defs/__schema4" },
+            "stepId": { "$ref": "#/$defs/__schema0" },
+            "retryable": { "type": "boolean" },
+            "expectedState": { "$ref": "#/$defs/__schema6" },
+            "observedState": { "$ref": "#/$defs/__schema6" },
+            "evidence": {
+              "maxItems": 16,
+              "type": "array",
+              "items": { "$ref": "#/$defs/__schema3" }
+            },
+            "causeCode": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["category", "code", "message", "retryable", "evidence"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["status", "runId", "evidence", "completedAt", "error"],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "__schema0": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$" },
+    "__schema1": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "__schema2": { "maxItems": 32, "type": "array", "items": { "$ref": "#/$defs/__schema3" } },
+    "__schema3": {
+      "type": "object",
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/__schema0" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "screenshot",
+            "semanticSnapshot",
+            "domSnapshot",
+            "trace",
+            "eventLog",
+            "result",
+            "artifact",
+            "intervention"
+          ]
+        },
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sanitization": { "type": "string", "enum": ["sanitized", "redacted", "synthetic"] },
+        "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "mediaType": { "maxLength": 128, "$ref": "#/$defs/__schema4" }
+      },
+      "required": ["evidenceId", "kind", "path", "sanitization"],
+      "additionalProperties": false
+    },
+    "__schema4": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "__schema5": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "__schema6": {
+      "anyOf": [
+        { "type": ["string", "number", "boolean", "null"] },
+        { "maxItems": 100, "type": "array", "items": { "$ref": "#/$defs/__schema6" } },
+        {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/__schema7" },
+          "additionalProperties": { "$ref": "#/$defs/__schema6" }
+        }
+      ]
+    },
+    "__schema7": { "type": "string", "maxLength": 128 }
+  }
+}
