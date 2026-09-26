@@ -1,0 +1,545 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "banking.lookup-customer-account",
+  "version": "1.0.0",
+  "lifecycle": "draft",
+  "name": "Lookup customer account",
+  "description": "Staff workflow that finds a customer by username and returns account details.",
+  "target": {
+    "surface": "web",
+    "product": "abc-bank-demo",
+    "productVersionRange": "1.x",
+    "entryPoint": {
+      "kind": "relativeRoute",
+      "route": "/index"
+    },
+    "fingerprints": [
+      {
+        "kind": "requiredText",
+        "id": "login-heading",
+        "text": "Login"
+      },
+      {
+        "kind": "requiredTarget",
+        "id": "login-username",
+        "targetDescription": "Login username field"
+      }
+    ]
+  },
+  "contract": {
+    "inputs": {
+      "customerUsername": {
+        "description": "Username of the customer to locate.",
+        "shape": {
+          "kind": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Customer username",
+          "example": "demo-customer"
+        }
+      }
+    },
+    "requiredSecrets": [
+      "BANK_STAFF_USERNAME",
+      "BANK_STAFF_PASSWORD"
+    ],
+    "outputs": {
+      "accountNumber": {
+        "description": "Customer account identifier.",
+        "shape": {
+          "kind": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Account number",
+          "example": "000000"
+        }
+      },
+      "currentBalance": {
+        "description": "Current balance represented without floating-point conversion.",
+        "shape": {
+          "kind": "object",
+          "properties": {
+            "amount": {
+              "kind": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "example": "0.00"
+            },
+            "currency": {
+              "kind": "string",
+              "enum": ["USD"],
+              "example": "USD"
+            }
+          },
+          "required": ["amount", "currency"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "businessOutcomes": [
+      {
+        "code": "CUSTOMER_NOT_FOUND",
+        "description": "No customer matched the supplied username.",
+        "detection": {
+          "kind": "textPresent",
+          "description": "The customer list reports that no customer was found.",
+          "text": "Customer not found."
+        }
+      }
+    ]
+  },
+  "policyRef": "local-bank-read-only",
+  "preconditions": [],
+  "steps": [
+    {
+      "id": "open-login",
+      "description": "Open the bank login page.",
+      "action": {
+        "kind": "navigate",
+        "destination": {
+          "kind": "relativeRoute",
+          "route": "/index"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 15000,
+      "checkpoint": {
+        "kind": "textPresent",
+        "description": "The login form is visible.",
+        "text": "Login"
+      },
+      "recovery": {
+        "kind": "retry",
+        "maxAttempts": 2,
+        "retryableErrorCodes": ["NAVIGATION_TIMEOUT"],
+        "backoff": {
+          "kind": "fixed",
+          "delayMs": 250
+        },
+        "idempotent": true
+      }
+    },
+    {
+      "id": "enter-staff-username",
+      "description": "Enter the configured staff username.",
+      "action": {
+        "kind": "enterText",
+        "target": {
+          "description": "Login username field",
+          "candidates": [
+            {
+              "strategy": "attribute",
+              "name": "name",
+              "value": { "kind": "literal", "value": "username" }
+            },
+            {
+              "strategy": "label",
+              "text": { "kind": "literal", "value": "Username:" }
+            }
+          ],
+          "match": "exactlyOne"
+        },
+        "value": {
+          "kind": "secret",
+          "name": "BANK_STAFF_USERNAME"
+        },
+        "clear": true
+      },
+      "risk": "reversibleWrite",
+      "timeoutMs": 10000,
+      "checkpoint": {
+        "kind": "elementVisible",
+        "description": "The username field remains available after entry.",
+        "target": {
+          "description": "Login username field",
+          "candidates": [
+            {
+              "strategy": "attribute",
+              "name": "name",
+              "value": { "kind": "literal", "value": "username" }
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "recovery": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "enter-staff-password",
+      "description": "Enter the configured staff password.",
+      "action": {
+        "kind": "enterText",
+        "target": {
+          "description": "Login password field",
+          "candidates": [
+            {
+              "strategy": "attribute",
+              "name": "name",
+              "value": { "kind": "literal", "value": "password" }
+            },
+            {
+              "strategy": "label",
+              "text": { "kind": "literal", "value": "Password:" }
+            }
+          ],
+          "match": "exactlyOne"
+        },
+        "value": {
+          "kind": "secret",
+          "name": "BANK_STAFF_PASSWORD"
+        },
+        "clear": true
+      },
+      "risk": "reversibleWrite",
+      "timeoutMs": 10000,
+      "checkpoint": {
+        "kind": "elementVisible",
+        "description": "The login submit control is visible.",
+        "target": {
+          "description": "Login submit control",
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "button",
+              "name": { "kind": "literal", "value": "Submit" },
+              "exact": true
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "recovery": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "submit-login",
+      "description": "Submit the staff login form.",
+      "action": {
+        "kind": "activate",
+        "target": {
+          "description": "Login submit control",
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "button",
+              "name": { "kind": "literal", "value": "Submit" },
+              "exact": true
+            },
+            {
+              "strategy": "attribute",
+              "name": "type",
+              "value": { "kind": "literal", "value": "submit" }
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "risk": "reversibleWrite",
+      "timeoutMs": 15000,
+      "checkpoint": {
+        "kind": "urlMatches",
+        "description": "Authentication reaches the staff console.",
+        "pattern": "/staff"
+      },
+      "recovery": {
+        "kind": "reauthenticate",
+        "maxAttempts": 1,
+        "checkpoint": {
+          "kind": "textPresent",
+          "description": "The login form is available for one reauthentication attempt.",
+          "text": "Login"
+        }
+      }
+    },
+    {
+      "id": "open-customers",
+      "description": "Open the staff Customers page.",
+      "action": {
+        "kind": "activate",
+        "target": {
+          "description": "Customers navigation link",
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "link",
+              "name": { "kind": "literal", "value": "Customers" },
+              "exact": true
+            },
+            {
+              "strategy": "text",
+              "text": { "kind": "literal", "value": "Customers" },
+              "exact": true
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 15000,
+      "checkpoint": {
+        "kind": "urlMatches",
+        "description": "The customer search page is open.",
+        "pattern": "/showcust"
+      },
+      "recovery": {
+        "kind": "retry",
+        "maxAttempts": 2,
+        "retryableErrorCodes": ["NAVIGATION_TIMEOUT"],
+        "backoff": {
+          "kind": "exponential",
+          "initialDelayMs": 250,
+          "maxDelayMs": 1000
+        },
+        "idempotent": true
+      }
+    },
+    {
+      "id": "enter-customer-search",
+      "description": "Enter the invocation customer username in the search field.",
+      "action": {
+        "kind": "enterText",
+        "target": {
+          "description": "Customer username search field",
+          "candidates": [
+            {
+              "strategy": "label",
+              "text": { "kind": "literal", "value": "Find customer by username:" },
+              "exact": true
+            },
+            {
+              "strategy": "attribute",
+              "name": "name",
+              "value": { "kind": "literal", "value": "username" }
+            }
+          ],
+          "match": "exactlyOne"
+        },
+        "value": {
+          "kind": "input",
+          "name": "customerUsername"
+        },
+        "clear": true
+      },
+      "risk": "reversibleWrite",
+      "timeoutMs": 10000,
+      "checkpoint": {
+        "kind": "elementVisible",
+        "description": "The customer search submit control is visible.",
+        "target": {
+          "description": "Customer search submit control",
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "button",
+              "name": { "kind": "literal", "value": "Search" },
+              "exact": true
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "recovery": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "submit-customer-search",
+      "description": "Search for the requested customer.",
+      "action": {
+        "kind": "activate",
+        "target": {
+          "description": "Customer search submit control",
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "button",
+              "name": { "kind": "literal", "value": "Search" },
+              "exact": true
+            },
+            {
+              "strategy": "attribute",
+              "name": "type",
+              "value": { "kind": "literal", "value": "submit" }
+            }
+          ],
+          "match": "exactlyOne"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 15000,
+      "checkpoint": {
+        "kind": "any",
+        "description": "The search produced either a customer action or a not-found outcome.",
+        "children": [
+          {
+            "kind": "elementVisible",
+            "description": "A customer details action is available.",
+            "target": {
+              "description": "Customer View Details action",
+              "candidates": [
+                {
+                  "strategy": "role",
+                  "role": "link",
+                  "name": { "kind": "literal", "value": "View Details" },
+                  "exact": true
+                }
+              ],
+              "match": "firstVisible"
+            }
+          },
+          {
+            "kind": "textPresent",
+            "description": "The application reports no matching customer.",
+            "text": "Customer not found."
+          }
+        ]
+      },
+      "recovery": {
+        "kind": "retry",
+        "maxAttempts": 2,
+        "retryableErrorCodes": ["APPLICATION_TIMEOUT"],
+        "backoff": {
+          "kind": "fixed",
+          "delayMs": 250
+        },
+        "idempotent": true
+      }
+    },
+    {
+      "id": "open-customer-details",
+      "description": "Open the matching customer details record.",
+      "action": {
+        "kind": "activate",
+        "target": {
+          "description": "View Details action for the searched customer",
+          "scope": [
+            {
+              "strategy": "text",
+              "text": { "kind": "input", "name": "customerUsername" },
+              "exact": false
+            }
+          ],
+          "candidates": [
+            {
+              "strategy": "role",
+              "role": "link",
+              "name": { "kind": "literal", "value": "View Details" },
+              "exact": true
+            },
+            {
+              "strategy": "xpath",
+              "expression": "//a[normalize-space()='View Details']"
+            }
+          ],
+          "match": "firstVisible"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 15000,
+      "checkpoint": {
+        "kind": "textPresent",
+        "description": "The customer details page displays the account field.",
+        "text": "Account No."
+      },
+      "recovery": {
+        "kind": "retry",
+        "maxAttempts": 2,
+        "retryableErrorCodes": ["NAVIGATION_TIMEOUT"],
+        "backoff": {
+          "kind": "fixed",
+          "delayMs": 250
+        },
+        "idempotent": true
+      }
+    },
+    {
+      "id": "extract-account-number",
+      "description": "Extract the account number from the details table.",
+      "action": {
+        "kind": "extract",
+        "output": "accountNumber",
+        "target": {
+          "description": "Account number value in customer details",
+          "candidates": [
+            {
+              "strategy": "xpath",
+              "expression": "//tr[td[normalize-space()='Account No.']]/td[2]"
+            }
+          ],
+          "match": "exactlyOne"
+        },
+        "transform": {
+          "kind": "trim"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 10000,
+      "checkpoint": {
+        "kind": "outputPresent",
+        "description": "An account number has been extracted.",
+        "output": "accountNumber"
+      },
+      "recovery": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "extract-current-balance",
+      "description": "Extract the current balance as a USD amount object.",
+      "action": {
+        "kind": "extract",
+        "output": "currentBalance",
+        "target": {
+          "description": "Balance value in customer details",
+          "candidates": [
+            {
+              "strategy": "xpath",
+              "expression": "//tr[td[normalize-space()='Balance']]/td[2]"
+            }
+          ],
+          "match": "exactlyOne"
+        },
+        "transform": {
+          "kind": "amountWithCurrency",
+          "currency": "USD"
+        }
+      },
+      "risk": "read",
+      "timeoutMs": 10000,
+      "checkpoint": {
+        "kind": "outputPresent",
+        "description": "A current balance has been extracted.",
+        "output": "currentBalance"
+      },
+      "recovery": {
+        "kind": "none"
+      }
+    }
+  ],
+  "success": {
+    "kind": "all",
+    "description": "The requested account outputs are present and shaped.",
+    "children": [
+      {
+        "kind": "outputMatchesShape",
+        "description": "The account number matches its declared shape.",
+        "output": "accountNumber"
+      },
+      {
+        "kind": "outputMatchesShape",
+        "description": "The current balance matches its declared shape.",
+        "output": "currentBalance"
+      }
+    ]
+  },
+  "metadata": {
+    "createdAt": "2026-09-17T00:00:00Z",
+    "provenance": {
+      "kind": "authoredFixture",
+      "reason": "Hand-authored Phase 2 contract grounded in the existing local JSP staff workflow; not produced by a discovery run."
+    }
+  }
+}
