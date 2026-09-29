@@ -1,0 +1,5 @@
+local/
+runs/
+.DS_Store
+*.tmp
+*.scratch
