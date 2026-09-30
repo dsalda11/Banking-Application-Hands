@@ -93,8 +93,8 @@
         "description": "The authenticated staff identity cannot access the staff customer console.",
         "detection": {
           "kind": "textPresent",
-          "description": "The application reports that staff access is required.",
-          "text": "Staff access required"
+          "description": "The application renders its staff-access error page.",
+          "text": "Error Occured!! GO back and try again."
         }
       }
     ]

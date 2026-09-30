@@ -34,7 +34,7 @@
     "recovery-open-customers-password"
   ],
   "screenshotRules": { "enabled": true, "forbidWhileSecretFieldPopulated": true },
-  "traceRules": { "enabled": true, "startAfterAuthentication": true },
+  "traceRules": { "enabled": false, "startAfterAuthentication": true },
   "navigation": { "allowExternal": false, "maxNavigations": 12 },
   "downloads": "deny",
   "uploads": "deny",

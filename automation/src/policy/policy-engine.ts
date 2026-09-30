@@ -26,6 +26,7 @@ export class PolicyDecisionError extends Error {
   constructor(
     readonly code: 'POLICY_DENIED' | 'POLICY_INTERVENTION_REQUIRED',
     message: string,
+    readonly decision?: PolicyDecision,
   ) {
     super(message);
     this.name = 'PolicyDecisionError';
@@ -114,21 +115,47 @@ export class PolicyEngine {
         risk: 'prohibited',
         reason: 'Consequential actions are prohibited by policy',
       };
+    // A policy may require a human at an otherwise permitted read-only action.
+    // Evaluate this before strategy-specific allow rules such as navigation.
+    if (
+      this.policy.interventionActions.includes(actionType) ||
+      this.policy.interventionStepIds.includes(step.id)
+    )
+      return {
+        ...base,
+        decision: 'requireIntervention',
+        reason: 'Action requires human intervention',
+      };
     if (actionType === 'navigate') {
       const route = routeFor(action);
       if (!route)
-        return { ...base, decision: 'deny', reason: 'Dynamic navigation cannot be pre-approved' };
+        return {
+          ...base,
+          decision: 'deny',
+          ruleId: 'navigation-static-only',
+          reason: 'Dynamic navigation cannot be pre-approved',
+        };
       let url: URL;
       try {
         url = new URL(route, this.policy.allowedOrigins[0]);
       } catch {
-        return { ...base, decision: 'deny', reason: 'Invalid navigation URL' };
+        return {
+          ...base,
+          decision: 'deny',
+          ruleId: 'navigation-origin-route-allowlist',
+          reason: 'Invalid navigation URL',
+        };
       }
       if (
         !this.policy.allowedOrigins.includes(url.origin) ||
         !this.policy.allowedRoutes.some((rule) => new RegExp(rule.pattern).test(url.pathname))
       )
-        return { ...base, decision: 'deny', reason: 'Navigation origin or route is not allowed' };
+        return {
+          ...base,
+          decision: 'deny',
+          ruleId: 'navigation-origin-route-allowlist',
+          reason: 'Navigation origin or route is not allowed',
+        };
       return {
         ...base,
         decision: 'allow',
@@ -147,12 +174,6 @@ export class PolicyEngine {
           reason: 'Secret reference is not approved for this step',
         };
     }
-    if (this.policy.interventionActions.includes(actionType))
-      return {
-        ...base,
-        decision: 'requireIntervention',
-        reason: 'Action requires human intervention',
-      };
     return {
       ...base,
       decision: 'allow',
@@ -179,8 +200,10 @@ export class PolicyEngine {
     recovery: boolean,
   ): void {
     const decision = this.decide(action, { id: stepId }, 'preflight', 1, 0, recovery ? 1 : 0);
-    if (decision.decision !== 'allow')
-      throw new PolicyDecisionError('POLICY_DENIED', decision.reason);
+    // Intervention is a valid, explicitly configured preflight result. Runtime
+    // replay decides whether to return it immediately or pause interactively.
+    if (decision.decision === 'deny')
+      throw new PolicyDecisionError('POLICY_DENIED', decision.reason, decision);
     if (
       action.kind === 'enterText' &&
       action.value.kind === 'input' &&
