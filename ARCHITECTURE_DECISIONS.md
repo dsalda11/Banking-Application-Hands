@@ -220,6 +220,8 @@ Retries are bounded by the artifact's recovery policy and are recorded as separa
 
 ### Phase 5 fail-closed policy and recovery
 
+Raw Playwright traces are not retained for credential-bearing browser sessions. A loopback browser fixture proves the artifact-declared, single bounded reauthentication path without production banking-session test hooks.
+
 Replay now has a declarative policy boundary between validated artifacts and the surface adapter. Static preflight and runtime decisions both default to deny and carry a policy hash, risk classification, sanitized target metadata, and correlation IDs into evidence. The local banking policy permits only the local origin, known routes, read/input actions, and explicitly declared login secrets; consequential or unknown behavior is prohibited.
 
 Session expiration is detected only by an artifact-declared positive checkpoint. If the step declares reauthentication, policy allows it, and the interrupted action is safe, replay runs the declared recovery sequence at most once and retries only that step. Permission denial is a terminal result distinct from session expiration and customer-not-found. Recovery and consequential retry behavior never contain banking-specific logic in `ReplayEngine`.

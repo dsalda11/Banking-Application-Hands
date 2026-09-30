@@ -14,6 +14,7 @@
     "artifact:list": "tsx src/cli/index.ts artifact:list",
     "artifact:validate": "tsx src/cli/index.ts artifact:validate",
     "replay": "tsx src/cli/index.ts replay",
+    "replay:interactive": "tsx src/cli/index.ts replay:interactive",
     "browser:install": "playwright install chromium",
     "build": "npx --no-install tsc -p tsconfig.build.json",
     "start": "node dist/cli/index.js",
