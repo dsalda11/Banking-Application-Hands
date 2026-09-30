@@ -2,11 +2,18 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { CapabilityActionType } from '../../src/domain/index.js';
+import { CapabilityAction, type CapabilityActionType } from '../../src/domain/index.js';
 import { loadArtifact } from '../../src/replay/artifact-loader.js';
 import { ArtifactRegistry, ArtifactRegistryError } from '../../src/replay/artifact-registry.js';
 import { validateRuntimeBindings, RuntimeBindingError } from '../../src/replay/runtime-bindings.js';
 import { ReplayEngine } from '../../src/replay/replay-engine.js';
+import {
+  loadPolicy,
+  PolicyLoadError,
+  PolicyRegistry,
+  PolicyRegistryError,
+} from '../../src/policy/policy-loader.js';
+import { PolicyEngine } from '../../src/policy/policy-engine.js';
 import type { SurfaceAdapter } from '../../src/surfaces/surface-types.js';
 
 const examplePath = path.resolve(
@@ -45,6 +52,63 @@ describe('artifact loading and registry', () => {
     await writeFile(path.join(directory, 'b.json'), raw, 'utf8');
     const registry = new ArtifactRegistry(directory);
     await expect(registry.discover()).rejects.toBeInstanceOf(ArtifactRegistryError);
+  });
+});
+
+describe('fail-closed policy', () => {
+  it('loads the strict policy and denies external navigation and unapproved secrets', async () => {
+    const loaded = await loadPolicy(
+      path.resolve(process.cwd(), '../policies/local-bank-readonly.v1.json'),
+    );
+    const engine = new PolicyEngine(loaded.policy, loaded.contentHash);
+    const external = CapabilityAction.parse({
+      kind: 'navigate',
+      destination: { kind: 'absoluteUrl', url: 'https://example.com' },
+    });
+    expect(engine.decide(external, { id: 'step' }, 'run', 1, 0, 0).decision).toBe('deny');
+    const secretAction = CapabilityAction.parse({
+      kind: 'enterText',
+      target: {
+        description: 'field',
+        candidates: [
+          { strategy: 'attribute', name: 'name', value: { kind: 'literal', value: 'x' } },
+        ],
+        match: 'exactlyOne',
+      },
+      value: { kind: 'secret', name: 'UNAPPROVED_SECRET' },
+      clear: true,
+    });
+    expect(engine.decide(secretAction, { id: 'step' }, 'run', 1, 0, 0).decision).toBe('deny');
+  });
+
+  it('rejects unsupported policies and duplicate policy identities', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'replay-policy-'));
+    const raw = JSON.parse(
+      await readFile(
+        path.resolve(process.cwd(), '../policies/local-bank-readonly.v1.json'),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    raw.schemaVersion = '9.0.0';
+    const unsupported = path.join(directory, 'unsupported.json');
+    await writeFile(unsupported, JSON.stringify(raw), 'utf8');
+    await expect(loadPolicy(unsupported)).rejects.toBeInstanceOf(PolicyLoadError);
+    const valid = await readFile(
+      path.resolve(process.cwd(), '../policies/local-bank-readonly.v1.json'),
+      'utf8',
+    );
+    await writeFile(path.join(directory, 'a.json'), valid, 'utf8');
+    await writeFile(path.join(directory, 'b.json'), valid, 'utf8');
+    await expect(new PolicyRegistry(directory).discover()).rejects.toBeInstanceOf(
+      PolicyRegistryError,
+    );
+    const invalidPattern = JSON.parse(valid) as { allowedRoutes: Array<{ pattern: string }> };
+    invalidPattern.allowedRoutes[0]!.pattern = '[';
+    const invalidPatternPath = path.join(directory, 'invalid-pattern.json');
+    await writeFile(invalidPatternPath, JSON.stringify(invalidPattern), 'utf8');
+    await expect(loadPolicy(invalidPatternPath)).rejects.toMatchObject({
+      code: 'POLICY_PATTERN_INVALID',
+    });
   });
 });
 
@@ -152,6 +216,9 @@ function fakeAdapter(): SurfaceAdapter & { actions: string[] } {
 describe('generic replay', () => {
   it('does not run banking-specific workflow code and returns declared outcomes', async () => {
     const loaded = await loadArtifact(examplePath);
+    const loadedPolicy = await loadPolicy(
+      path.resolve(process.cwd(), '../policies/local-bank-readonly.v1.json'),
+    );
     const adapter = fakeAdapter();
     const result = await new ReplayEngine().run({
       loadedArtifact: loaded,
@@ -161,6 +228,7 @@ describe('generic replay', () => {
       evidenceDirectory: '/tmp/evidence',
       headless: true,
       adapter,
+      loadedPolicy,
     });
     expect(result.status).toBe('businessOutcome');
     expect(adapter.actions.length).toBeGreaterThan(0);

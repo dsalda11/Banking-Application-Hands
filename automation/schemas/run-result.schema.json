@@ -15,7 +15,8 @@
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/__schema0" },
           "additionalProperties": { "$ref": "#/$defs/__schema6" }
-        }
+        },
+        "completionMode": { "type": "string", "enum": ["automation", "human"] }
       },
       "required": [
         "status",
@@ -91,6 +92,29 @@
         "evidence": { "maxItems": 32, "type": "array", "items": { "$ref": "#/$defs/__schema3" } }
       },
       "required": ["status", "runId", "interventionId", "currentStepId", "reasonCode", "evidence"],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "const": "aborted" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "code": { "type": "string", "const": "ABORTED_BY_HUMAN" }
+      },
+      "required": [
+        "status",
+        "runId",
+        "evidence",
+        "completedAt",
+        "artifactId",
+        "artifactVersion",
+        "code"
+      ],
       "additionalProperties": false
     },
     {
