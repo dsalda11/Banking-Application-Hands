@@ -218,6 +218,12 @@ The replay engine is a separate provider-independent interpreter for validated c
 
 Retries are bounded by the artifact's recovery policy and are recorded as separate sanitized events. Checkpoints are evaluated after actions; declared business outcomes are checked from artifact data and terminate with a distinct result. Required outputs are checked only after the artifact success checkpoint passes. The filesystem registry uses exact capability ID/version keys and rejects duplicates. This keeps discovery, compilation, replay, evidence, and browser mechanics independently testable and fail-closed.
 
+### Phase 5 fail-closed policy and recovery
+
+Replay now has a declarative policy boundary between validated artifacts and the surface adapter. Static preflight and runtime decisions both default to deny and carry a policy hash, risk classification, sanitized target metadata, and correlation IDs into evidence. The local banking policy permits only the local origin, known routes, read/input actions, and explicitly declared login secrets; consequential or unknown behavior is prohibited.
+
+Session expiration is detected only by an artifact-declared positive checkpoint. If the step declares reauthentication, policy allows it, and the interrupted action is safe, replay runs the declared recovery sequence at most once and retries only that step. Permission denial is a terminal result distinct from session expiration and customer-not-found. Recovery and consequential retry behavior never contain banking-specific logic in `ReplayEngine`.
+
 The loop is bounded by `maxSteps`, wall-clock timeout, repeated-state detection, and cancellation:
 
 1. `SurfaceAdapter.observe()` captures the sanitized multimodal state.

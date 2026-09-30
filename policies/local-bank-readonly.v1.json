@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "local-bank-read-only",
+  "version": "1.0.0",
+  "description": "Fail-closed read-only policy for the local ABC Bank customer lookup capability.",
+  "allowedOrigins": ["http://127.0.0.1:8080"],
+  "allowedRoutes": [
+    { "id": "login", "pattern": "^/index$" },
+    { "id": "staff", "pattern": "^/staff$" },
+    { "id": "customers", "pattern": "^/showcust$" },
+    { "id": "customer-details", "pattern": "^/getDetails$" }
+  ],
+  "allowedActions": ["navigate", "activate", "enterText", "selectOption", "pressKey", "scroll", "wait", "extract"],
+  "deniedActions": [],
+  "riskByAction": {
+    "navigate": "navigation",
+    "activate": "read",
+    "enterText": "input",
+    "selectOption": "input",
+    "pressKey": "input",
+    "scroll": "read",
+    "wait": "read",
+    "extract": "read"
+  },
+  "allowedSecretReferences": ["BANK_STAFF_USERNAME", "BANK_STAFF_PASSWORD"],
+  "allowedSecretStepIds": [
+    "enter-staff-username",
+    "enter-staff-password",
+    "recovery-enter-staff-username",
+    "recovery-enter-staff-password",
+    "recovery-submit-login",
+    "recovery-open-customers-login",
+    "recovery-open-customers-username",
+    "recovery-open-customers-password"
+  ],
+  "screenshotRules": { "enabled": true, "forbidWhileSecretFieldPopulated": true },
+  "traceRules": { "enabled": true, "startAfterAuthentication": true },
+  "navigation": { "allowExternal": false, "maxNavigations": 12 },
+  "downloads": "deny",
+  "uploads": "deny",
+  "maxReplayDurationMs": 120000,
+  "maxActionAttempts": 3,
+  "authenticationRecovery": { "allowed": true, "maxAttempts": 1 },
+  "interventionActions": [],
+  "defaultDecision": "deny",
+  "metadata": { "createdAt": "2026-09-28T00:00:00Z" }
+}
