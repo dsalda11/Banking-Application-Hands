@@ -14,7 +14,12 @@ import { evaluateCheckpoint } from './checkpoint-evaluator.js';
 import { resolveTarget, type ResolvedLocator } from './locator-resolver.js';
 import { collectObservation } from './observation-collector.js';
 import { PlaywrightSession } from './playwright-session.js';
-import { evidenceReference, prepareEvidenceDirectory, writeJson } from './safe-artifacts.js';
+import {
+  evidenceReference,
+  prepareEvidenceDirectory,
+  writeJson,
+  writeJsonLines,
+} from './safe-artifacts.js';
 import { SurfaceError } from '../surface-errors.js';
 import type {
   CheckpointEvaluationResult,
@@ -300,13 +305,13 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
     );
   }
   async writeEventLog(events: readonly SurfaceEvent[]): Promise<EvidenceReferenceType> {
-    const filePath = path.join(this.evidenceDirectory, 'events.json');
-    await writeJson(filePath, events);
+    const filePath = path.join(this.evidenceDirectory, 'events.jsonl');
+    await writeJsonLines(filePath, events);
     return evidenceReference(
       path.resolve(this.evidenceDirectory, '../../..'),
       filePath,
       'eventLog',
-      'application/json',
+      'application/x-ndjson',
     );
   }
   async close(): Promise<void> {

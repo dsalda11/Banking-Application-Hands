@@ -142,4 +142,35 @@ describe('Playwright surface fixture', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBeInstanceOf(SurfaceError);
   });
+  it('returns explicit missing and ambiguous locator errors without clicking', async () => {
+    await adapter.session.page!.setContent('<button>One</button><button>Two</button>');
+    const missing = await adapter.execute(
+      {
+        kind: 'activate',
+        target: {
+          description: 'missing control',
+          candidates: [
+            { strategy: 'role', role: 'button', name: { kind: 'literal', value: 'Missing' } },
+          ],
+          match: 'exactlyOne',
+        },
+      },
+      context,
+    );
+    expect(missing.error?.code).toBe('LOCATOR_NOT_FOUND');
+    expect(missing.error?.message).toContain('role:0');
+    const ambiguous = await adapter.execute(
+      {
+        kind: 'activate',
+        target: {
+          description: 'ambiguous control',
+          candidates: [{ strategy: 'role', role: 'button' }],
+          match: 'exactlyOne',
+        },
+      },
+      context,
+    );
+    expect(ambiguous.error?.code).toBe('LOCATOR_AMBIGUOUS');
+    expect(ambiguous.error?.message).toContain('role:2');
+  });
 });

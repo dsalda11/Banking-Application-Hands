@@ -93,7 +93,13 @@ export async function runBankingSurfaceSmoke(
     );
     if (!loginCheckpoint.passed)
       throw new SurfaceError('CHECKPOINT_FAILED', 'Staff login checkpoint did not pass');
-    await adapter.startTrace({ name: 'post-login-trace' });
+    events.push({
+      timestamp: new Date().toISOString(),
+      eventType: 'trace_omitted',
+      action: 'trace',
+      reason: 'Raw Playwright traces are disabled because they cannot be retained safely.',
+      ok: true,
+    });
     for (const id of ['open-customers', 'enter-customer-search', 'submit-customer-search'])
       await runAction(id);
     const notFound = await adapter.evaluateCheckpoint(
@@ -104,7 +110,6 @@ export async function runBankingSurfaceSmoke(
       screenshot = await adapter.captureScreenshot({ name: 'not-found-final' });
       observation = await adapter.observe();
       await adapter.writeObservation(observation);
-      trace = await adapter.stopTrace();
       const eventEvidence = await adapter.writeEventLog(events);
       const result: RunResultType = {
         status: 'businessOutcome',
@@ -128,7 +133,6 @@ export async function runBankingSurfaceSmoke(
     screenshot = await adapter.captureScreenshot({ name: 'success-final' });
     observation = await adapter.observe();
     await adapter.writeObservation(observation);
-    trace = await adapter.stopTrace();
     const eventEvidence = await adapter.writeEventLog(events);
     const result: RunResultType = {
       status: 'success',

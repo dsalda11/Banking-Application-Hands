@@ -31,6 +31,14 @@ export async function writeJson(filePath: string, value: unknown): Promise<void>
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
+export async function writeJsonLines(filePath: string, values: readonly unknown[]): Promise<void> {
+  await writeFile(
+    filePath,
+    values.map((value) => JSON.stringify(value)).join('\n') + (values.length ? '\n' : ''),
+    'utf8',
+  );
+}
+
 export function sha256(value: string | Buffer): string {
   return createHash('sha256').update(value).digest('hex');
 }
