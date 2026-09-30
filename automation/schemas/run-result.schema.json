@@ -59,6 +59,30 @@
     {
       "type": "object",
       "properties": {
+        "status": { "type": "string", "const": "permissionDenied" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "code": { "type": "string", "const": "PERMISSION_DENIED" },
+        "stepId": { "$ref": "#/$defs/__schema0" }
+      },
+      "required": [
+        "status",
+        "runId",
+        "evidence",
+        "completedAt",
+        "artifactId",
+        "artifactVersion",
+        "code"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
         "status": { "type": "string", "const": "needsHuman" },
         "runId": { "$ref": "#/$defs/__schema0" },
         "interventionId": { "$ref": "#/$defs/__schema0" },

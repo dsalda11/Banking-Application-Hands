@@ -9,6 +9,7 @@ import { DiscoveryDecision } from './discovery.js';
 import { DiscoveryEvent } from './events.js';
 import { InterventionRequest } from './intervention.js';
 import { RunResult } from './run-result.js';
+import { ReplayPolicy } from './policy.js';
 
 const schemaDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../schemas');
 const definitions: readonly (readonly [string, z.ZodTypeAny])[] = [
@@ -17,6 +18,7 @@ const definitions: readonly (readonly [string, z.ZodTypeAny])[] = [
   ['discovery-event', DiscoveryEvent],
   ['intervention-request', InterventionRequest],
   ['run-result', RunResult],
+  ['replay-policy', ReplayPolicy],
 ];
 
 type JsonSchemaDocument = Record<string, unknown>;
@@ -160,7 +162,7 @@ async function schemaFor(name: string, schema: z.ZodTypeAny): Promise<string> {
   // Zod's emitter expands recursive discriminated unions aggressively. The runtime Zod schemas remain authoritative;
   // these stable review projections keep the checked-in documents finite and machine-readable.
   const document =
-    name === 'intervention-request' || name === 'run-result'
+    name === 'intervention-request' || name === 'run-result' || name === 'replay-policy'
       ? toJsonSchema(schema, { target: 'draft-2020-12', io: 'input', cycles: 'ref', reused: 'ref' })
       : reviewSchema(name);
   return prettier.format(JSON.stringify(document), { parser: 'json', printWidth: 100 });

@@ -182,6 +182,50 @@ export function validateArtifactSemantics(
           step.id,
         );
     }
+    if (step.recovery.kind === 'reauthenticate') {
+      for (const recoveryStep of step.recovery.steps) {
+        visitCheckpointOutputs(
+          recoveryStep.checkpoint,
+          `steps.${index}.recovery.steps.${recoveryStep.id}.checkpoint`,
+          recoveryStep.id,
+        );
+        const recoveryAction = recoveryStep.action;
+        if ('target' in recoveryAction && recoveryAction.target)
+          visitTarget(
+            recoveryAction.target,
+            `steps.${index}.recovery.steps.${recoveryStep.id}.action.target`,
+            recoveryStep.id,
+          );
+        if (
+          recoveryAction.kind === 'navigate' &&
+          'kind' in recoveryAction.destination &&
+          (recoveryAction.destination.kind === 'input' ||
+            recoveryAction.destination.kind === 'secret' ||
+            recoveryAction.destination.kind === 'literal')
+        )
+          visitValue(
+            recoveryAction.destination,
+            `steps.${index}.recovery.steps.${recoveryStep.id}.action.destination`,
+            recoveryStep.id,
+          );
+        if (recoveryAction.kind === 'enterText' || recoveryAction.kind === 'selectOption')
+          visitValue(
+            recoveryAction.value,
+            `steps.${index}.recovery.steps.${recoveryStep.id}.action.value`,
+            recoveryStep.id,
+          );
+      }
+      visitCheckpointOutputs(
+        step.recovery.sessionExpired,
+        `steps.${index}.recovery.sessionExpired`,
+        step.id,
+      );
+      visitCheckpointOutputs(
+        step.recovery.checkpoint,
+        `steps.${index}.recovery.checkpoint`,
+        step.id,
+      );
+    }
   }
   for (const [index, outcome] of artifact.contract.businessOutcomes.entries()) {
     if (outcomeCodes.has(outcome.code))

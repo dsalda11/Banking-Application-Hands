@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "id": { "$ref": "#/$defs/__schema0" },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "description": { "$ref": "#/$defs/__schema1" },
+    "allowedOrigins": {
+      "minItems": 1,
+      "maxItems": 16,
+      "type": "array",
+      "items": { "$ref": "#/$defs/__schema2" }
+    },
+    "allowedRoutes": { "maxItems": 64, "type": "array", "items": { "$ref": "#/$defs/__schema3" } },
+    "allowedActions": { "maxItems": 16, "type": "array", "items": { "$ref": "#/$defs/__schema4" } },
+    "deniedActions": { "maxItems": 16, "type": "array", "items": { "$ref": "#/$defs/__schema4" } },
+    "riskByAction": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/__schema4" },
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["read", "input", "navigation", "authentication", "consequential", "prohibited"]
+      },
+      "required": [
+        "navigate",
+        "activate",
+        "enterText",
+        "selectOption",
+        "pressKey",
+        "scroll",
+        "wait",
+        "extract"
+      ]
+    },
+    "allowedSecretReferences": {
+      "maxItems": 32,
+      "type": "array",
+      "items": { "$ref": "#/$defs/__schema0" }
+    },
+    "allowedSecretStepIds": {
+      "maxItems": 32,
+      "type": "array",
+      "items": { "$ref": "#/$defs/__schema0" }
+    },
+    "screenshotRules": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "forbidWhileSecretFieldPopulated": { "type": "boolean", "const": true }
+      },
+      "required": ["enabled", "forbidWhileSecretFieldPopulated"],
+      "additionalProperties": false
+    },
+    "traceRules": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "startAfterAuthentication": { "type": "boolean", "const": true }
+      },
+      "required": ["enabled", "startAfterAuthentication"],
+      "additionalProperties": false
+    },
+    "navigation": {
+      "type": "object",
+      "properties": {
+        "allowExternal": { "type": "boolean", "const": false },
+        "maxNavigations": { "type": "integer", "minimum": 1, "maximum": 100 }
+      },
+      "required": ["allowExternal", "maxNavigations"],
+      "additionalProperties": false
+    },
+    "downloads": { "type": "string", "const": "deny" },
+    "uploads": { "type": "string", "const": "deny" },
+    "maxReplayDurationMs": { "type": "integer", "minimum": 1000, "maximum": 3600000 },
+    "maxActionAttempts": { "type": "integer", "minimum": 1, "maximum": 10 },
+    "authenticationRecovery": {
+      "type": "object",
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "maxAttempts": { "type": "number", "const": 1 }
+      },
+      "required": ["allowed", "maxAttempts"],
+      "additionalProperties": false
+    },
+    "interventionActions": {
+      "maxItems": 16,
+      "type": "array",
+      "items": { "$ref": "#/$defs/__schema4" }
+    },
+    "defaultDecision": { "type": "string", "const": "deny" },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        }
+      },
+      "required": ["createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "version",
+    "description",
+    "allowedOrigins",
+    "allowedRoutes",
+    "allowedActions",
+    "deniedActions",
+    "riskByAction",
+    "allowedSecretReferences",
+    "allowedSecretStepIds",
+    "screenshotRules",
+    "traceRules",
+    "navigation",
+    "downloads",
+    "uploads",
+    "maxReplayDurationMs",
+    "maxActionAttempts",
+    "authenticationRecovery",
+    "interventionActions",
+    "defaultDecision",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "__schema0": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$" },
+    "__schema1": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "__schema2": { "type": "string", "format": "uri" },
+    "__schema3": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/__schema0" },
+        "pattern": { "$ref": "#/$defs/__schema1" }
+      },
+      "required": ["id", "pattern"],
+      "additionalProperties": false
+    },
+    "__schema4": {
+      "type": "string",
+      "enum": [
+        "navigate",
+        "activate",
+        "enterText",
+        "selectOption",
+        "pressKey",
+        "scroll",
+        "wait",
+        "extract"
+      ]
+    }
+  }
+}

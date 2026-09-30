@@ -32,6 +32,14 @@ export const RunResult = z.discriminatedUnion('status', [
     details: z.record(Identifier, JsonValue).optional(),
   }),
   z.strictObject({
+    status: z.literal('permissionDenied'),
+    ...ResultBase,
+    artifactId: Identifier,
+    artifactVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+    code: z.literal('PERMISSION_DENIED'),
+    stepId: Identifier.optional(),
+  }),
+  z.strictObject({
     status: z.literal('needsHuman'),
     runId: Identifier,
     interventionId: Identifier,

@@ -79,11 +79,22 @@
     "businessOutcomes": [
       {
         "code": "CUSTOMER_NOT_FOUND",
+        "result": "businessOutcome",
         "description": "No customer matched the supplied username.",
         "detection": {
           "kind": "textPresent",
           "description": "The customer list reports that no customer was found.",
           "text": "Customer not found."
+        }
+      },
+      {
+        "code": "PERMISSION_DENIED",
+        "result": "permissionDenied",
+        "description": "The authenticated staff identity cannot access the staff customer console.",
+        "detection": {
+          "kind": "textPresent",
+          "description": "The application reports that staff access is required.",
+          "text": "Staff access required"
         }
       }
     ]
@@ -245,13 +256,7 @@
         "pattern": "/staff"
       },
       "recovery": {
-        "kind": "reauthenticate",
-        "maxAttempts": 1,
-        "checkpoint": {
-          "kind": "textPresent",
-          "description": "The login form is available for one reauthentication attempt.",
-          "text": "Login"
-        }
+        "kind": "none"
       }
     },
     {
@@ -285,15 +290,60 @@
         "pattern": "/showcust"
       },
       "recovery": {
-        "kind": "retry",
-        "maxAttempts": 2,
-        "retryableErrorCodes": ["NAVIGATION_TIMEOUT"],
-        "backoff": {
-          "kind": "exponential",
-          "initialDelayMs": 250,
-          "maxDelayMs": 1000
+        "kind": "reauthenticate",
+        "maxAttempts": 1,
+        "sessionExpired": {
+          "kind": "textPresent",
+          "description": "The unauthenticated login form is visible.",
+          "text": "Login"
         },
-        "idempotent": true
+        "steps": [
+          {
+            "id": "recovery-open-customers-username",
+            "description": "Enter the declared staff username during recovery.",
+            "action": {
+              "kind": "enterText",
+              "target": { "description": "Login username field", "candidates": [ { "strategy": "attribute", "name": "name", "value": { "kind": "literal", "value": "username" } } ], "match": "exactlyOne" },
+              "value": { "kind": "secret", "name": "BANK_STAFF_USERNAME" },
+              "clear": true
+            },
+            "timeoutMs": 10000,
+            "checkpoint": { "kind": "elementVisible", "description": "The recovery username field is visible.", "target": { "description": "Login username field", "candidates": [ { "strategy": "attribute", "name": "name", "value": { "kind": "literal", "value": "username" } } ], "match": "exactlyOne" } }
+          },
+          {
+            "id": "recovery-open-customers-password",
+            "description": "Enter the declared staff password during recovery.",
+            "action": {
+              "kind": "enterText",
+              "target": { "description": "Login password field", "candidates": [ { "strategy": "attribute", "name": "name", "value": { "kind": "literal", "value": "password" } } ], "match": "exactlyOne" },
+              "value": { "kind": "secret", "name": "BANK_STAFF_PASSWORD" },
+              "clear": true
+            },
+            "timeoutMs": 10000,
+            "checkpoint": { "kind": "elementVisible", "description": "The recovery submit control is visible.", "target": { "description": "Login submit control", "candidates": [ { "strategy": "role", "role": "button", "name": { "kind": "literal", "value": "Submit" }, "exact": true } ], "match": "exactlyOne" } }
+          },
+          {
+            "id": "recovery-open-customers-login",
+            "description": "Submit the declared authentication recovery flow.",
+            "action": {
+              "kind": "activate",
+              "target": {
+                "description": "Login submit control",
+                "candidates": [
+                  { "strategy": "role", "role": "button", "name": { "kind": "literal", "value": "Submit" }, "exact": true }
+                ],
+                "match": "exactlyOne"
+              }
+            },
+            "timeoutMs": 15000,
+            "checkpoint": { "kind": "urlMatches", "description": "Recovery reaches the staff console.", "pattern": "/staff" }
+          }
+        ],
+        "checkpoint": {
+          "kind": "urlMatches",
+          "description": "Recovery is authenticated before resuming.",
+          "pattern": "/staff"
+        }
       }
     },
     {
