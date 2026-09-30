@@ -22,8 +22,24 @@ export interface TraceOptions {
 }
 export interface SurfaceEvent {
   readonly timestamp: string;
+  readonly runId?: string;
+  readonly interventionId?: string;
+  readonly generation?: number;
+  readonly coordinatorRevision?: number;
+  readonly eventType?: string;
   readonly stepId?: string;
   readonly action: string;
+  readonly attempt?: number;
+  readonly risk?: string;
+  readonly policyDecision?: string;
+  readonly policyId?: string;
+  readonly policyVersion?: string;
+  readonly policyHash?: string;
+  readonly matchingRuleId?: string;
+  readonly reason?: string;
+  readonly expected?: unknown;
+  readonly observed?: unknown;
+  readonly recoveryId?: string;
   readonly locatorStrategy?: string;
   readonly durationMs?: number;
   readonly ok: boolean;
