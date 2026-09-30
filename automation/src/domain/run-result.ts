@@ -22,6 +22,7 @@ export const RunResult = z.discriminatedUnion('status', [
     artifactId: Identifier,
     artifactVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
     outputs: z.record(Identifier, JsonValue),
+    completionMode: z.enum(['automation', 'human']).optional(),
   }),
   z.strictObject({
     status: z.literal('businessOutcome'),
@@ -46,6 +47,13 @@ export const RunResult = z.discriminatedUnion('status', [
     currentStepId: Identifier,
     reasonCode: Identifier,
     evidence: z.array(EvidenceReference).max(32),
+  }),
+  z.strictObject({
+    status: z.literal('aborted'),
+    ...ResultBase,
+    artifactId: Identifier,
+    artifactVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+    code: z.literal('ABORTED_BY_HUMAN'),
   }),
   z.strictObject({
     status: z.literal('failure'),

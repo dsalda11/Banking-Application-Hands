@@ -28,6 +28,8 @@ const rawEnvironmentSchema = z.object({
   BANK_APP_BASE_URL: z.string().url().default('http://127.0.0.1:8080'),
   BANK_STAFF_USERNAME: optionalSecret,
   BANK_STAFF_PASSWORD: optionalSecret,
+  BANK_NON_STAFF_USERNAME: optionalSecret,
+  BANK_NON_STAFF_PASSWORD: optionalSecret,
   BANK_CUSTOMER_USERNAME: optionalSecret,
   OPENAI_API_KEY: optionalSecret,
   OPENAI_MODEL: z.string().trim().min(1).default('gpt-5.6-terra'),
@@ -42,6 +44,7 @@ const rawEnvironmentSchema = z.object({
 export interface LoadEnvironmentOptions {
   readonly requireOpenAI?: boolean;
   readonly requireBankCredentials?: boolean;
+  readonly requireNonStaffCredentials?: boolean;
 }
 
 export interface AutomationEnvironment {
@@ -50,6 +53,8 @@ export interface AutomationEnvironment {
   readonly bankAppBaseUrl: string;
   readonly bankStaffUsername?: string;
   readonly bankStaffPassword?: string;
+  readonly bankNonStaffUsername?: string;
+  readonly bankNonStaffPassword?: string;
   readonly bankCustomerUsername?: string;
   readonly openAiApiKey?: string;
   readonly openAiModel: string;
@@ -93,6 +98,16 @@ export function loadEnvironment(options: LoadEnvironmentOptions = {}): Automatio
     'BANK_STAFF_PASSWORD',
     options.requireBankCredentials ?? false,
   );
+  const bankNonStaffUsername = requiredSecret(
+    parsed.BANK_NON_STAFF_USERNAME,
+    'BANK_NON_STAFF_USERNAME',
+    options.requireNonStaffCredentials ?? false,
+  );
+  const bankNonStaffPassword = requiredSecret(
+    parsed.BANK_NON_STAFF_PASSWORD,
+    'BANK_NON_STAFF_PASSWORD',
+    options.requireNonStaffCredentials ?? false,
+  );
 
   return Object.freeze({
     nodeEnvironment: parsed.NODE_ENV,
@@ -100,6 +115,8 @@ export function loadEnvironment(options: LoadEnvironmentOptions = {}): Automatio
     bankAppBaseUrl: parsed.BANK_APP_BASE_URL,
     ...(bankStaffUsername ? { bankStaffUsername } : {}),
     ...(bankStaffPassword ? { bankStaffPassword } : {}),
+    ...(bankNonStaffUsername ? { bankNonStaffUsername } : {}),
+    ...(bankNonStaffPassword ? { bankNonStaffPassword } : {}),
     ...(parsed.BANK_CUSTOMER_USERNAME
       ? { bankCustomerUsername: parsed.BANK_CUSTOMER_USERNAME }
       : {}),
