@@ -147,14 +147,18 @@ export async function resolveTarget(
       };
     if (target.match === 'exactlyOne' && count > 1) continue;
   }
+  const counts = await Promise.all(
+    target.candidates.map(async (candidate) => ({
+      strategy: candidate.strategy,
+      count: await visibleCount(locate(root, candidate, context)),
+    })),
+  );
   const code =
-    target.match === 'exactlyOne' &&
-    (
-      await Promise.all(
-        target.candidates.map((candidate) => visibleCount(locate(root, candidate, context))),
-      )
-    ).some((count) => count > 1)
+    target.match === 'exactlyOne' && counts.some(({ count }) => count > 1)
       ? 'LOCATOR_AMBIGUOUS'
       : 'LOCATOR_NOT_FOUND';
-  throw new SurfaceError(code, `Could not resolve ${target.description}`);
+  throw new SurfaceError(
+    code,
+    `Could not resolve ${target.description}; attempts=${counts.map(({ strategy, count }) => `${strategy}:${count}`).join(',')}`,
+  );
 }

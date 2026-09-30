@@ -20,7 +20,9 @@ export type SurfaceErrorCode =
   | 'CHECKPOINT_FAILED'
   | 'UNSUPPORTED_CHECKPOINT'
   | 'UNEXPECTED_DIALOG'
-  | 'BROWSER_LAUNCH_FAILED';
+  | 'BROWSER_LAUNCH_FAILED'
+  | 'SESSION_EXPIRED'
+  | 'PERMISSION_DENIED';
 
 export class SurfaceError extends Error {
   constructor(
