@@ -81,3 +81,21 @@ BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
 ```
 
 The replay command returns exit code `0` for success, `2` for an expected business outcome, and `1` for a failure. Secrets are resolved only from environment names listed in the artifact and are never accepted as CLI inputs.
+
+Policy-controlled replay uses the strict local policy by default; it can also be supplied explicitly:
+
+```bash
+BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
+  npm run replay -- \
+    --artifact ../artifacts/lookup-customer-account.v1.example.json \
+    --policy ../policies/local-bank-readonly.v1.json \
+    --input customerUsername=customer
+```
+
+Exit codes are `0` success, `1` terminal engine/configuration/policy failure, `2` declared business outcome, `3` declared permission denial, and `4` intervention required. Policy denials, permission denial, session expiration, recovery, locator failures, checkpoint failures, and retry attempts are recorded as sanitized event evidence.
+
+## Recovery fixture and trace retention
+
+`npm run test:surface` includes a loopback-only browser fixture for one bounded authentication recovery, a second-expiration terminal failure, and permission denial without reauthentication. It uses the production artifact loader, policy loader, replay engine, and Playwright adapter; the Java banking application is not modified to force session expiry.
+
+Raw Playwright trace ZIPs are disabled by the local read-only policy because DOM snapshots, network data, and browser state cannot be reliably sanitized. JSONL events, password-safe screenshots, and bounded observations remain the audit evidence. Passwords, cookies, session tokens, and authorization values are confidential; usernames and customer lookup values are identifiers that can legitimately appear in visible UI or declared input data.
