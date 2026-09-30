@@ -91,6 +91,12 @@
       "type": "array",
       "items": { "$ref": "#/$defs/__schema4" }
     },
+    "interventionStepIds": {
+      "default": [],
+      "maxItems": 32,
+      "type": "array",
+      "items": { "$ref": "#/$defs/__schema0" }
+    },
     "defaultDecision": { "type": "string", "const": "deny" },
     "metadata": {
       "type": "object",

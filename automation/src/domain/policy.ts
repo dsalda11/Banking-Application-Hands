@@ -49,6 +49,8 @@ export const ReplayPolicy = z.strictObject({
   maxActionAttempts: z.number().int().min(1).max(10),
   authenticationRecovery: z.strictObject({ allowed: z.boolean(), maxAttempts: z.literal(1) }),
   interventionActions: z.array(PolicyActionKind).max(16),
+  /** Exact IDs keep a demo intervention scoped to one safe artifact step. */
+  interventionStepIds: z.array(Identifier).max(32).default([]),
   defaultDecision: z.literal('deny'),
   metadata: z.strictObject({ createdAt: Timestamp }),
 });
