@@ -5,6 +5,7 @@ import { Identifier, NonEmptyString } from './primitives.js';
 
 export const BusinessOutcome = z.strictObject({
   code: Identifier,
+  result: z.enum(['businessOutcome', 'permissionDenied']).default('businessOutcome'),
   description: NonEmptyString.max(256),
   detection: Checkpoint,
   detailsOutputs: z.array(Identifier).max(8).optional(),

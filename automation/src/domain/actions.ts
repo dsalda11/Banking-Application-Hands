@@ -24,6 +24,11 @@ export const RecoveryPolicy = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('reauthenticate'),
     maxAttempts: z.literal(1),
+    sessionExpired: Checkpoint,
+    steps: z
+      .array(z.lazy(() => RecoveryStep))
+      .min(1)
+      .max(16),
     checkpoint: Checkpoint,
   }),
   z.strictObject({ kind: z.literal('escalateToHuman'), reason: NonEmptyString.max(256) }),
@@ -87,6 +92,15 @@ export const CapabilityAction = z.discriminatedUnion('kind', [
     transform: Transform,
   }),
 ]);
+
+export const RecoveryStep = z.strictObject({
+  id: Identifier,
+  description: NonEmptyString.max(256),
+  action: CapabilityAction,
+  timeoutMs: z.number().int().min(1).max(120000),
+  checkpoint: Checkpoint,
+});
+export type RecoveryStepType = z.infer<typeof RecoveryStep>;
 
 export const RiskClassification = z.enum(['read', 'reversibleWrite', 'irreversibleWrite']);
 
