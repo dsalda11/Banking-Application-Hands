@@ -18,6 +18,7 @@ describe('generated JSON Schemas', () => {
     for (const name of [
       'capability-artifact',
       'discovery-decision',
+      'discovery-goal',
       'discovery-event',
       'intervention-request',
       'run-result',

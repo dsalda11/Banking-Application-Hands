@@ -7,6 +7,14 @@ describe('CapabilityArtifact', () => {
   it('parses the draft example and survives JSON serialization', () => {
     const artifact = CapabilityArtifact.parse(parsedFixture());
     expect(artifact.id).toBe('banking.lookup-customer-account');
+    const details = artifact.steps.find((step) => step.id === 'open-customer-details');
+    expect(details?.checkpoint).toMatchObject({
+      kind: 'all',
+      children: expect.arrayContaining([
+        expect.objectContaining({ kind: 'urlMatches', pattern: '/getDetails' }),
+        expect.objectContaining({ kind: 'textPresent', text: 'Account No.' }),
+      ]),
+    });
     expect(CapabilityArtifact.parse(JSON.parse(JSON.stringify(artifact))).version).toBe('1.0.0');
   });
 

@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { CapabilityArtifact, type CapabilityArtifactType } from '../domain/index.js';
+import { contentHash } from '../compiler/canonical-json.js';
 
 export type ArtifactLoadErrorCode =
   | 'ARTIFACT_READ_FAILED'
@@ -85,6 +85,5 @@ export async function loadArtifact(filePath: string): Promise<LoadedArtifact> {
       'Capability artifact failed semantic validation',
       semantic.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message),
     );
-  const contentHash = createHash('sha256').update(JSON.stringify(artifact)).digest('hex');
-  return { artifact, contentHash, path: filePath };
+  return { artifact, contentHash: contentHash(artifact), path: filePath };
 }

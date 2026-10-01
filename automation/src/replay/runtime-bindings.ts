@@ -19,7 +19,7 @@ export class RuntimeBindingError extends Error {
   }
 }
 
-function matchesShape(value: unknown, shape: DataShapeType): boolean {
+export function matchesShape(value: unknown, shape: DataShapeType): boolean {
   switch (shape.kind) {
     case 'string':
       return (

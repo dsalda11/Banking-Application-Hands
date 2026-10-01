@@ -60,13 +60,18 @@ export class InterventionDecisionChannel {
     });
   }
 
-  close(): void {
+  close(finalDecision?: ReplayInterventionDecision): void {
     if (this.isClosed) return;
     this.isClosed = true;
-    this.queued = undefined;
     const waiter = this.waiter;
     this.waiter = undefined;
+    if (finalDecision) {
+      if (waiter) waiter.resolve(finalDecision);
+      else if (!this.queued) this.queued = finalDecision;
+    } else {
+      this.queued = undefined;
+      waiter?.reject(new InterventionDecisionChannelError('CHANNEL_CLOSED'));
+    }
     this.revision += 1;
-    waiter?.reject(new InterventionDecisionChannelError('CHANNEL_CLOSED'));
   }
 }

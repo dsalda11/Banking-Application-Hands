@@ -13,6 +13,11 @@ import { loadPolicy, type LoadedPolicy } from '../../src/policy/policy-loader.js
 import { loadArtifact } from '../../src/replay/artifact-loader.js';
 import { ReplayEngine } from '../../src/replay/replay-engine.js';
 import { writeJsonLines } from '../../src/surfaces/web/safe-artifacts.js';
+import {
+  InteractiveReplayLifecycle,
+  type ShutdownSignal,
+  type SignalSource,
+} from '../../src/intervention/interactive-replay-lifecycle.js';
 
 const artifactPath = path.resolve(
   process.cwd(),
@@ -82,9 +87,11 @@ function adapter(evidenceDirectory?: string) {
     },
     async evaluateCheckpoint(checkpoint, context) {
       if (validationBarrier) {
-        validationBarrier.calls += 1;
-        validationBarrier.entered.resolve();
-        await validationBarrier.release.promise;
+        const currentBarrier = validationBarrier;
+        validationBarrier = undefined;
+        currentBarrier.calls += 1;
+        currentBarrier.entered.resolve();
+        await currentBarrier.release.promise;
       }
       Object.assign(context.outputs, completionOutputs);
       return {
@@ -187,6 +194,146 @@ async function runOptions(surface: SurfaceAdapter, loadedPolicy: LoadedPolicy) {
 }
 
 describe('ReplayEngine intervention control', () => {
+  it.each([
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ] as const)('interrupts an interactive replay safely on %s', async (signal, exitCode) => {
+    const evidenceDirectory = await mkdtemp(path.join(os.tmpdir(), 'signal-evidence-'));
+    const target = adapter(evidenceDirectory);
+    const listeners = new Map<ShutdownSignal, Set<() => void>>();
+    const signalSource: SignalSource = {
+      on: (name, listener) => {
+        const set = listeners.get(name) ?? new Set();
+        set.add(listener);
+        listeners.set(name, set);
+      },
+      off: (name, listener) => listeners.get(name)?.delete(listener),
+    };
+    const ready = deferred<void>();
+    let coordinator: OperatorInterventionCoordinator | undefined;
+    let observedExitCode = -1;
+    const lifecycle = new InteractiveReplayLifecycle({
+      signalSource,
+      createCoordinator: (onUrl) => {
+        coordinator = new OperatorInterventionCoordinator((url) => {
+          expect(url.startsWith('http://127.0.0.1:')).toBe(true);
+          onUrl(url);
+        });
+        return coordinator;
+      },
+      runReplay: async (value, cancellationSignal, interruptionSource) =>
+        new ReplayEngine().run({
+          ...(await runOptions(target.surface, interventionPolicy(await loadPolicy(policyPath)))),
+          executionMode: 'interactive',
+          interventionCoordinator: value,
+          cancellationSignal,
+          interruptionSource,
+        }),
+      outputOperatorUrl: () => ready.resolve(),
+      setExitCode: (code) => {
+        observedExitCode = code;
+      },
+    });
+    const replay = lifecycle.run();
+    await ready.promise;
+    expect(target.closes).toBe(0);
+    for (const listener of listeners.get(signal) ?? []) listener();
+    for (const listener of listeners.get(signal) ?? []) listener();
+    const result = await replay;
+    expect(result).toMatchObject({
+      status: 'interrupted',
+      code: 'INTERRUPTED_BY_SIGNAL',
+      signal,
+    });
+    expect(observedExitCode).toBe(exitCode);
+    expect(target.actions).toEqual([]);
+    expect(target.closes).toBe(1);
+    expect(coordinator?.snapshot().decisionChannelState).toBe('closed');
+    expect(coordinator?.pendingScheduledWork).toBe(0);
+    expect(listeners.get('SIGINT')?.size ?? 0).toBe(0);
+    expect(listeners.get('SIGTERM')?.size ?? 0).toBe(0);
+    const kinds = target.events.flat().map((event) => event.eventType);
+    expect(kinds.filter((kind) => kind === 'shutdown_signal_received')).toHaveLength(1);
+    expect(kinds.filter((kind) => kind === 'operator_server_stopped')).toHaveLength(1);
+    expect(kinds.filter((kind) => kind === 'run_interrupted')).toHaveLength(1);
+    const evidence = await readFile(target.eventPath!);
+    for (const confidential of [
+      'secret-password',
+      'Bearer sentinel-authorization',
+      'sentinel-cookie',
+      'sentinel-session-token',
+    ])
+      expect(evidence.includes(Buffer.from(confidential))).toBe(false);
+    await expect(lifecycle.cleanup()).resolves.toBeUndefined();
+    await rm(evidenceDirectory, { recursive: true, force: true });
+  });
+
+  it('defers signal cancellation until blocked validation reaches a safe boundary', async () => {
+    const target = adapter();
+    target.checkpointsPass = false;
+    const entered = deferred<void>();
+    const release = deferred<void>();
+    const barrier = { entered, release, calls: 0 };
+    target.validationBarrier = barrier;
+    const listeners = new Map<ShutdownSignal, Set<() => void>>();
+    const signalSource: SignalSource = {
+      on: (name, listener) => {
+        const set = listeners.get(name) ?? new Set();
+        set.add(listener);
+        listeners.set(name, set);
+      },
+      off: (name, listener) => listeners.get(name)?.delete(listener),
+    };
+    const ready = deferred<string>();
+    const lifecycle = new InteractiveReplayLifecycle({
+      signalSource,
+      createCoordinator: (onUrl) => new OperatorInterventionCoordinator(onUrl),
+      runReplay: async (coordinator, cancellationSignal, interruptionSource) =>
+        new ReplayEngine().run({
+          ...(await runOptions(target.surface, interventionPolicy(await loadPolicy(policyPath)))),
+          executionMode: 'interactive',
+          interventionCoordinator: coordinator,
+          cancellationSignal,
+          interruptionSource,
+        }),
+      outputOperatorUrl: ready.resolve,
+      setExitCode: () => {},
+    });
+    const replay = lifecycle.run();
+    const operatorUrl = await ready.promise;
+    const parsed = new URL(operatorUrl);
+    const token = parsed.hash.slice(1);
+    parsed.hash = '';
+    const headers = {
+      authorization: `Bearer ${token}`,
+      origin: parsed.origin,
+      'content-type': 'application/json',
+    };
+    const claim = (await (
+      await fetch(new URL('/api/claim', parsed), {
+        method: 'POST',
+        headers: { authorization: headers.authorization, origin: headers.origin },
+      })
+    ).json()) as { lease: { generation: number } };
+    const completion = fetch(new URL('/api/complete', parsed), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ generation: claim.lease.generation }),
+    });
+    await entered.promise;
+    for (const listener of listeners.get('SIGINT') ?? []) listener();
+    expect(target.closes).toBe(0);
+    release.resolve();
+    await completion.catch(() => undefined);
+    await expect(replay).resolves.toMatchObject({
+      status: 'interrupted',
+      signal: 'SIGINT',
+    });
+    expect(barrier.calls).toBe(1);
+    expect(target.actions).toEqual([]);
+    expect(target.closes).toBe(1);
+  });
+
   it('returns immediately without executing an intervention action in non-interactive mode', async () => {
     const target = adapter();
     const result = await new ReplayEngine().run({

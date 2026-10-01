@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "banking.discover-customer-account",
+  "version": "1.0.0",
+  "objective": "Log into the staff banking console, find the customer identified by customerUsername, and return the account number and current balance. If the customer does not exist, return CUSTOMER_NOT_FOUND.",
+  "startUrl": "http://127.0.0.1:8080/index",
+  "inputs": {
+    "customerUsername": {
+      "description": "Customer username to find.",
+      "shape": { "kind": "string", "minLength": 1, "maxLength": 128 }
+    }
+  },
+  "secretReferences": ["BANK_STAFF_USERNAME", "BANK_STAFF_PASSWORD"],
+  "outputs": {
+    "accountNumber": {
+      "description": "Customer account number.",
+      "shape": { "kind": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "currentBalance": {
+      "description": "Current account balance.",
+      "shape": {
+        "kind": "object",
+        "properties": {
+          "amount": { "kind": "string", "minLength": 1, "maxLength": 64 },
+          "currency": { "kind": "string", "enum": ["USD"] }
+        },
+        "required": ["amount", "currency"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "successCriteria": [
+    { "kind": "outputMatchesShape", "description": "Account number is typed.", "output": "accountNumber" },
+    { "kind": "outputMatchesShape", "description": "Current balance is typed.", "output": "currentBalance" }
+  ],
+  "businessOutcomes": [
+    {
+      "code": "CUSTOMER_NOT_FOUND",
+      "result": "businessOutcome",
+      "description": "No customer matched the supplied username.",
+      "detection": {
+        "kind": "textPresent",
+        "description": "The application reports no matching customer.",
+        "text": "Customer not found."
+      }
+    }
+  ],
+  "applicationScope": {
+    "allowedOrigins": ["http://127.0.0.1:8080"],
+    "allowedRoutePatterns": ["^/index$", "^/staff$", "^/showcust$", "^/getDetails$"]
+  },
+  "budgets": {
+    "maxModelCalls": 30,
+    "maxActions": 30,
+    "timeoutMs": 120000,
+    "maxRepeatedStates": 3,
+    "maxConsecutiveFailures": 3,
+    "maxNavigations": 10
+  },
+  "allowHumanIntervention": true,
+  "screenshotPolicy": "disabled",
+  "policyRef": "local-bank-discovery"
+}

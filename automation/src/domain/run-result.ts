@@ -56,6 +56,14 @@ export const RunResult = z.discriminatedUnion('status', [
     code: z.literal('ABORTED_BY_HUMAN'),
   }),
   z.strictObject({
+    status: z.literal('interrupted'),
+    ...ResultBase,
+    artifactId: Identifier,
+    artifactVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+    code: z.literal('INTERRUPTED_BY_SIGNAL'),
+    signal: z.enum(['SIGINT', 'SIGTERM']),
+  }),
+  z.strictObject({
     status: z.literal('failure'),
     ...ResultBase,
     artifactId: Identifier.optional(),

@@ -31,9 +31,14 @@ async function realStackPage() {
   let url = '';
   let open = false;
   let validationCalls = 0;
-  let postcondition = false;
-  const entered = deferred();
-  const release = deferred();
+  let workflowActions = 0;
+  let pendingActionExecutions = 0;
+  let checkpointsPass = true;
+  let pendingPostcondition = false;
+  let completionValid = false;
+  let barrier:
+    { entered: ReturnType<typeof deferred>; release: ReturnType<typeof deferred> } | undefined;
+  let latestContext: Parameters<SurfaceAdapter['evaluateCheckpoint']>[1] | undefined;
   const surface: SurfaceAdapter = {
     async start() {
       open = true;
@@ -50,7 +55,16 @@ async function realStackPage() {
       } as never;
     },
     async execute(action, context) {
-      if (action.kind === 'extract') context.outputs[action.output] = 'value';
+      workflowActions += 1;
+      if (
+        action.kind === 'navigate' &&
+        action.destination.kind === 'relativeRoute' &&
+        action.destination.route === '/index'
+      )
+        pendingActionExecutions += 1;
+      if (action.kind === 'extract')
+        context.outputs[action.output] =
+          action.output === 'currentBalance' ? { amount: '31444', currency: 'USD' } : '2023';
       return {
         ok: true,
         action: action.kind,
@@ -60,16 +74,29 @@ async function realStackPage() {
       };
     },
     async evaluateCheckpoint(checkpoint, context) {
-      if (
-        checkpoint.description.includes('account') ||
-        checkpoint.description.includes('success')
-      ) {
+      latestContext = context;
+      if (barrier) {
+        const current = barrier;
+        barrier = undefined;
         validationCalls += 1;
-        entered.resolve();
-        await release.promise;
+        current.entered.resolve();
+        await current.release.promise;
+      }
+      const isFinal =
+        checkpoint.description === 'The requested account outputs are present and shaped.';
+      const isBusinessOutcome =
+        checkpoint.description.includes('no customer was found') ||
+        checkpoint.description.includes('staff-access error page');
+      if (isFinal && completionValid) {
+        context.outputs.accountNumber = '2023';
+        context.outputs.currentBalance = { amount: '31444', currency: 'USD' };
       }
       return {
-        passed: postcondition,
+        passed: isBusinessOutcome
+          ? false
+          : isFinal
+            ? completionValid
+            : pendingPostcondition || checkpointsPass,
         kind: checkpoint.kind,
         description: checkpoint.description,
         observedState: {},
@@ -149,13 +176,37 @@ async function realStackPage() {
     page,
     coordinator,
     replay,
-    entered,
-    release,
+    armValidation() {
+      const next = { entered: deferred(), release: deferred() };
+      barrier = next;
+      return next;
+    },
+    setPendingPostcondition(value: boolean) {
+      pendingPostcondition = value;
+      checkpointsPass = value;
+    },
+    setCompletionValid(value: boolean) {
+      completionValid = value;
+      if (value && latestContext) {
+        latestContext.outputs.accountNumber = '2023';
+        latestContext.outputs.currentBalance = { amount: '31444', currency: 'USD' };
+      }
+    },
     get validationCalls() {
       return validationCalls;
     },
     get open() {
       return open;
+    },
+    get workflowActions() {
+      return workflowActions;
+    },
+    get pendingActionExecutions() {
+      return pendingActionExecutions;
+    },
+    releaseBarrier() {
+      barrier?.release.resolve();
+      barrier = undefined;
     },
   };
 }
@@ -226,7 +277,7 @@ describe('loopback operator page', () => {
       await expect.poll(() => harness.page.locator('#resume').isEnabled()).toBe(true);
       expect(harness.open).toBe(true);
     } finally {
-      harness.release.resolve();
+      harness.releaseBarrier();
       if (harness.coordinator.snapshot().owner === 'human')
         await harness.page.getByRole('button', { name: 'Abort Run' }).click();
       await harness.replay;
@@ -235,22 +286,165 @@ describe('loopback operator page', () => {
 
   it('locks the real operator page while ReplayEngine completion validation is blocked', async () => {
     const harness = await realStackPage();
+    const validation = harness.armValidation();
     try {
       await expect.poll(() => harness.page.locator('#claim').isEnabled()).toBe(true);
       await harness.page.getByRole('button', { name: 'Claim Control' }).click();
       await expect.poll(() => harness.page.locator('#complete').isEnabled()).toBe(true);
       await harness.page.getByRole('button', { name: 'Complete Task' }).click();
-      await harness.entered.promise;
+      await validation.entered.promise;
       await expect.poll(() => harness.coordinator.snapshot().validationState).toBe('validating');
       await expect.poll(() => harness.page.locator('#validation').textContent()).toBe('validating');
       for (const id of ['claim', 'reclaim', 'resume', 'complete', 'abort'])
         await expect.poll(() => harness.page.locator(`#${id}`).isDisabled()).toBe(true);
       expect(harness.validationCalls).toBe(1);
-      harness.release.resolve();
+      validation.release.resolve();
       await expect.poll(() => harness.coordinator.snapshot().owner).toBe('human');
       await expect.poll(() => harness.page.locator('#complete').isEnabled()).toBe(true);
     } finally {
-      harness.release.resolve();
+      validation.release.resolve();
+      if (harness.coordinator.snapshot().owner === 'human')
+        await harness.page.getByRole('button', { name: 'Abort Run' }).click();
+      await harness.replay;
+    }
+  });
+
+  it('rejects then accepts Resume through the real operator page without duplicating the action', async () => {
+    const harness = await realStackPage();
+    try {
+      await expect.poll(() => harness.page.locator('#claim').isEnabled()).toBe(true);
+      await harness.page.getByRole('button', { name: 'Claim Control' }).click();
+      const originalGeneration = harness.coordinator.snapshot().generation;
+      harness.setPendingPostcondition(false);
+      const first = harness.armValidation();
+      await harness.page.getByRole('button', { name: 'Resume Automation' }).click();
+      await first.entered.promise;
+      await expect.poll(() => harness.page.locator('#validation').textContent()).toBe('validating');
+      first.release.resolve();
+      await expect.poll(() => harness.coordinator.snapshot().validationState).toBe('rejected');
+      await expect.poll(() => harness.coordinator.snapshot().owner).toBe('human');
+      const restoredGeneration = harness.coordinator.snapshot().generation;
+      expect(restoredGeneration).toBeGreaterThan(originalGeneration);
+      await expect
+        .poll(() => harness.page.locator('#generation').textContent())
+        .toBe(String(restoredGeneration));
+      await expect
+        .poll(() => harness.page.locator('#status').textContent())
+        .toContain('Validation rejected');
+      for (const id of ['resume', 'complete', 'abort'])
+        await expect.poll(() => harness.page.locator(`#${id}`).isEnabled()).toBe(true);
+      expect(harness.pendingActionExecutions).toBe(0);
+      expect(harness.open).toBe(true);
+
+      harness.setPendingPostcondition(true);
+      harness.setCompletionValid(true);
+      const second = harness.armValidation();
+      await harness.page.getByRole('button', { name: 'Resume Automation' }).click();
+      await second.entered.promise;
+      second.release.resolve();
+      const result = await harness.replay;
+      expect(result.status).toBe('success');
+      expect(harness.pendingActionExecutions).toBe(0);
+      expect(harness.open).toBe(false);
+    } finally {
+      harness.releaseBarrier();
+      if (harness.coordinator.snapshot().owner === 'human')
+        await harness.page.getByRole('button', { name: 'Abort Run' }).click();
+      await harness.replay;
+    }
+  });
+
+  it('rejects then accepts Complete through the real operator page with typed human output', async () => {
+    const harness = await realStackPage();
+    let completeRequests = 0;
+    harness.page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/complete') completeRequests += 1;
+    });
+    try {
+      await expect.poll(() => harness.page.locator('#claim').isEnabled()).toBe(true);
+      await harness.page.getByRole('button', { name: 'Claim Control' }).click();
+      const originalGeneration = harness.coordinator.snapshot().generation;
+      harness.setPendingPostcondition(false);
+      harness.setCompletionValid(false);
+      const first = harness.armValidation();
+      await harness.page.getByRole('button', { name: 'Complete Task' }).click();
+      await first.entered.promise;
+      await expect.poll(() => harness.page.locator('#validation').textContent()).toBe('validating');
+      for (const id of ['claim', 'reclaim', 'resume', 'complete', 'abort'])
+        expect(await harness.page.locator(`#${id}`).isDisabled()).toBe(true);
+      await harness.page.getByRole('button', { name: 'Complete Task' }).press('Enter');
+      expect(harness.validationCalls).toBe(1);
+      expect(completeRequests).toBe(1);
+      first.release.resolve();
+      await expect.poll(() => harness.coordinator.snapshot().owner).toBe('human');
+      const restoredGeneration = harness.coordinator.snapshot().generation;
+      expect(restoredGeneration).toBeGreaterThan(originalGeneration);
+      await expect
+        .poll(() => harness.page.locator('#generation').textContent())
+        .toBe(String(restoredGeneration));
+      await expect
+        .poll(() => harness.page.locator('#status').textContent())
+        .toContain('Validation rejected');
+      expect(harness.workflowActions).toBe(0);
+
+      harness.setPendingPostcondition(true);
+      harness.setCompletionValid(true);
+      const second = harness.armValidation();
+      await harness.page.getByRole('button', { name: 'Complete Task' }).click();
+      await second.entered.promise;
+      second.release.resolve();
+      const result = await harness.replay;
+      expect(result).toMatchObject({
+        status: 'success',
+        completionMode: 'human',
+        outputs: {
+          accountNumber: '2023',
+          currentBalance: { amount: '31444', currency: 'USD' },
+        },
+      });
+      expect(harness.workflowActions).toBe(0);
+      expect(harness.open).toBe(false);
+    } finally {
+      harness.releaseBarrier();
+      if (harness.coordinator.snapshot().owner === 'human')
+        await harness.page.getByRole('button', { name: 'Abort Run' }).click();
+      await harness.replay;
+    }
+  });
+
+  it('ignores a stale coordinator revision without restoring an old generation or controls', async () => {
+    const harness = await realStackPage();
+    try {
+      await expect.poll(() => harness.page.locator('#claim').isEnabled()).toBe(true);
+      await harness.page.getByRole('button', { name: 'Claim Control' }).click();
+      await expect.poll(() => harness.coordinator.snapshot().owner).toBe('human');
+      const current = harness.coordinator.snapshot();
+      await expect
+        .poll(() => harness.page.locator('#generation').textContent())
+        .toBe(String(current.generation));
+      await harness.page.evaluate(
+        ({ revision, generation }) => {
+          (globalThis as typeof globalThis & { render(value: unknown): void }).render({
+            status: {
+              revision,
+              owner: 'none',
+              generation,
+              leaseState: 'PAUSED',
+              validationState: 'idle',
+              decisionChannelState: 'waiting',
+              terminal: false,
+            },
+          });
+        },
+        { revision: current.revision - 1, generation: current.generation - 1 },
+      );
+      expect(await harness.page.locator('#generation').textContent()).toBe(
+        String(current.generation),
+      );
+      expect(await harness.page.locator('#resume').isEnabled()).toBe(true);
+      expect(await harness.page.locator('#claim').isDisabled()).toBe(true);
+    } finally {
+      harness.releaseBarrier();
       if (harness.coordinator.snapshot().owner === 'human')
         await harness.page.getByRole('button', { name: 'Abort Run' }).click();
       await harness.replay;
