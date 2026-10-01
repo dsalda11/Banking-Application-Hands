@@ -120,6 +120,31 @@
     {
       "type": "object",
       "properties": {
+        "status": { "type": "string", "const": "interrupted" },
+        "runId": { "$ref": "#/$defs/__schema0" },
+        "artifactHash": { "$ref": "#/$defs/__schema1" },
+        "evidence": { "$ref": "#/$defs/__schema2" },
+        "completedAt": { "$ref": "#/$defs/__schema5" },
+        "artifactId": { "$ref": "#/$defs/__schema0" },
+        "artifactVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "code": { "type": "string", "const": "INTERRUPTED_BY_SIGNAL" },
+        "signal": { "type": "string", "enum": ["SIGINT", "SIGTERM"] }
+      },
+      "required": [
+        "status",
+        "runId",
+        "evidence",
+        "completedAt",
+        "artifactId",
+        "artifactVersion",
+        "code",
+        "signal"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
         "status": { "type": "string", "const": "failure" },
         "runId": { "$ref": "#/$defs/__schema0" },
         "artifactHash": { "$ref": "#/$defs/__schema1" },

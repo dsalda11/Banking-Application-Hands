@@ -1,39 +1,901 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interface.ai/schemas/discovery-decision.schema.json",
-  "title": "discovery-decision",
   "oneOf": [
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "reason", "action"],
       "properties": {
-        "kind": { "const": "action" },
-        "reason": { "type": "string" },
-        "action": { "type": "object" }
-      }
+        "kind": { "type": "string", "const": "click" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "elementReference": { "$ref": "#/$defs/__schema0" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "elementReference"
+      ],
+      "additionalProperties": false
     },
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "summary", "candidateOutputs", "successEvidence"],
       "properties": {
-        "kind": { "const": "complete" },
-        "summary": { "type": "string" },
-        "candidateOutputs": { "type": "object" },
-        "successEvidence": { "type": "object" }
-      }
+        "kind": { "type": "string", "const": "enterInput" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "elementReference": { "$ref": "#/$defs/__schema0" },
+        "inputName": { "$ref": "#/$defs/__schema0" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "elementReference",
+        "inputName"
+      ],
+      "additionalProperties": false
     },
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["kind", "reasonCode", "explanation", "currentStateSummary"],
       "properties": {
-        "kind": { "const": "requestHuman" },
-        "reasonCode": { "type": "string" },
-        "explanation": { "type": "string" },
-        "currentStateSummary": { "type": "string" }
-      }
+        "kind": { "type": "string", "const": "enterSecret" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "elementReference": { "$ref": "#/$defs/__schema0" },
+        "secretName": { "$ref": "#/$defs/__schema0" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "elementReference",
+        "secretName"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "navigate" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "pressKey" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "elementReference": { "$ref": "#/$defs/__schema0" },
+        "key": {
+          "type": "string",
+          "enum": ["Enter", "Escape", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]
+        }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "scroll" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "direction": { "type": "string", "enum": ["up", "down"] },
+        "amount": { "type": "integer", "minimum": 1, "maximum": 1000 }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "direction",
+        "amount"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "extract" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "elementReference": { "$ref": "#/$defs/__schema0" },
+        "outputName": { "$ref": "#/$defs/__schema0" },
+        "transform": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "trim",
+            "normalizeWhitespace",
+            "parseIntegerString",
+            "parseDecimalString",
+            "amountUsd"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "elementReference",
+        "outputName",
+        "transform"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "assertCheckpoint" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "checkpoint": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "urlMatches" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "pattern": { "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["kind", "description", "pattern"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "titleMatches" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "pattern": { "maxLength": 256, "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["kind", "description", "pattern"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "elementVisible" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "target": { "$ref": "#/$defs/__schema7" }
+              },
+              "required": ["kind", "description", "target"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "elementAbsent" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "target": { "$ref": "#/$defs/__schema7" }
+              },
+              "required": ["kind", "description", "target"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "textPresent" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "text": { "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["kind", "description", "text"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "textAbsent" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "text": { "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["kind", "description", "text"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "valueEquals" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "target": { "$ref": "#/$defs/__schema7" },
+                "value": { "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["kind", "description", "target", "value"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "outputPresent" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "output": { "$ref": "#/$defs/__schema0" }
+              },
+              "required": ["kind", "description", "output"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "outputMatchesShape" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "output": { "$ref": "#/$defs/__schema0" }
+              },
+              "required": ["kind", "description", "output"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "applicationFingerprint" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "fingerprintId": { "$ref": "#/$defs/__schema0" }
+              },
+              "required": ["kind", "description", "fingerprintId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "all" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "children": {
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/__schema14" }
+                }
+              },
+              "required": ["kind", "description", "children"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "any" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "children": {
+                  "minItems": 1,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/__schema14" }
+                }
+              },
+              "required": ["kind", "description", "children"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "const": "not" },
+                "description": { "$ref": "#/$defs/__schema6" },
+                "child": { "$ref": "#/$defs/__schema14" }
+              },
+              "required": ["kind", "description", "child"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "checkpoint"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "reportBusinessOutcome" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "outcomeCode": { "$ref": "#/$defs/__schema0" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "outcomeCode"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "finish" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "requestHuman" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "reason": { "maxLength": 256, "$ref": "#/$defs/__schema3" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "const": "stopSafely" },
+        "proposalId": { "$ref": "#/$defs/__schema0" },
+        "observationId": { "$ref": "#/$defs/__schema0" },
+        "stateFingerprint": { "$ref": "#/$defs/__schema1" },
+        "rationale": { "$ref": "#/$defs/__schema2" },
+        "expectedPostcondition": { "$ref": "#/$defs/__schema4" },
+        "confidence": { "$ref": "#/$defs/__schema5" },
+        "reason": { "maxLength": 256, "$ref": "#/$defs/__schema3" }
+      },
+      "required": [
+        "kind",
+        "proposalId",
+        "observationId",
+        "stateFingerprint",
+        "rationale",
+        "expectedPostcondition",
+        "reason"
+      ],
+      "additionalProperties": false
     }
-  ]
+  ],
+  "$defs": {
+    "__schema0": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$" },
+    "__schema1": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "__schema2": { "maxLength": 240, "$ref": "#/$defs/__schema3" },
+    "__schema3": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "__schema4": { "maxLength": 256, "$ref": "#/$defs/__schema3" },
+    "__schema5": { "type": "number", "minimum": 0, "maximum": 1 },
+    "__schema6": { "maxLength": 256, "$ref": "#/$defs/__schema3" },
+    "__schema7": {
+      "type": "object",
+      "properties": {
+        "description": { "maxLength": 256, "$ref": "#/$defs/__schema3" },
+        "framePath": { "maxItems": 4, "type": "array", "items": { "$ref": "#/$defs/__schema8" } },
+        "scope": { "maxItems": 4, "type": "array", "items": { "$ref": "#/$defs/__schema8" } },
+        "candidates": {
+          "minItems": 1,
+          "maxItems": 8,
+          "type": "array",
+          "items": { "$ref": "#/$defs/__schema8" }
+        },
+        "match": { "type": "string", "enum": ["exactlyOne", "firstVisible"] }
+      },
+      "required": ["description", "candidates", "match"],
+      "additionalProperties": false
+    },
+    "__schema8": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "role" },
+            "role": { "maxLength": 128, "$ref": "#/$defs/__schema3" },
+            "name": { "$ref": "#/$defs/__schema9" },
+            "exact": { "type": "boolean" }
+          },
+          "required": ["strategy", "role"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "label" },
+            "text": { "$ref": "#/$defs/__schema9" },
+            "exact": { "$ref": "#/$defs/__schema10" }
+          },
+          "required": ["strategy", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "text" },
+            "text": { "$ref": "#/$defs/__schema9" },
+            "exact": { "$ref": "#/$defs/__schema10" }
+          },
+          "required": ["strategy", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "attribute" },
+            "name": { "$ref": "#/$defs/__schema0" },
+            "value": { "$ref": "#/$defs/__schema9" }
+          },
+          "required": ["strategy", "name", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "css" },
+            "selector": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["strategy", "selector"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "xpath" },
+            "expression": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["strategy", "expression"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "$ref": "#/$defs/__schema11" },
+            "role": { "$ref": "#/$defs/__schema12" },
+            "name": { "$ref": "#/$defs/__schema13" }
+          },
+          "required": ["strategy"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": { "type": "string", "const": "visualAnchor" },
+            "evidence": {
+              "type": "object",
+              "properties": {
+                "evidenceId": { "$ref": "#/$defs/__schema0" },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "screenshot",
+                    "semanticSnapshot",
+                    "domSnapshot",
+                    "trace",
+                    "eventLog",
+                    "result",
+                    "artifact",
+                    "intervention"
+                  ]
+                },
+                "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+                "sanitization": {
+                  "type": "string",
+                  "enum": ["sanitized", "redacted", "synthetic"]
+                },
+                "checksum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "mediaType": { "maxLength": 128, "$ref": "#/$defs/__schema3" }
+              },
+              "required": ["evidenceId", "kind", "path", "sanitization"],
+              "additionalProperties": false
+            },
+            "anchorName": { "maxLength": 128, "$ref": "#/$defs/__schema3" },
+            "threshold": { "type": "number", "minimum": 0.5, "maximum": 1 }
+          },
+          "required": ["strategy", "evidence", "anchorName", "threshold"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema9": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "literal" },
+            "value": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "input" },
+            "name": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "name"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema10": { "type": "boolean" },
+    "__schema11": { "type": "string", "const": "accessibility" },
+    "__schema12": { "maxLength": 128, "$ref": "#/$defs/__schema3" },
+    "__schema13": { "$ref": "#/$defs/__schema9" },
+    "__schema14": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "urlMatches" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "pattern": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "pattern"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "titleMatches" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "pattern": { "maxLength": 256, "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "pattern"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "elementVisible" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" }
+          },
+          "required": ["kind", "description", "target"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "elementAbsent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" }
+          },
+          "required": ["kind", "description", "target"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "textPresent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "text": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "textAbsent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "text": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "valueEquals" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" },
+            "value": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "target", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "outputPresent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "output": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "output"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "outputMatchesShape" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "output": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "output"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "applicationFingerprint" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "fingerprintId": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "fingerprintId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "all" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "children": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": { "$ref": "#/$defs/__schema15" }
+            }
+          },
+          "required": ["kind", "description", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "any" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "children": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": { "$ref": "#/$defs/__schema15" }
+            }
+          },
+          "required": ["kind", "description", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "not" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "child": { "$ref": "#/$defs/__schema15" }
+          },
+          "required": ["kind", "description", "child"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema15": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "urlMatches" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "pattern": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "pattern"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "titleMatches" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "pattern": { "maxLength": 256, "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "pattern"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "elementVisible" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" }
+          },
+          "required": ["kind", "description", "target"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "elementAbsent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" }
+          },
+          "required": ["kind", "description", "target"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "textPresent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "text": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "textAbsent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "text": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "text"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "valueEquals" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "target": { "$ref": "#/$defs/__schema7" },
+            "value": { "$ref": "#/$defs/__schema3" }
+          },
+          "required": ["kind", "description", "target", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "outputPresent" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "output": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "output"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "outputMatchesShape" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "output": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "output"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "applicationFingerprint" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "fingerprintId": { "$ref": "#/$defs/__schema0" }
+          },
+          "required": ["kind", "description", "fingerprintId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "all" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "children": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": { "$ref": "#/$defs/__schema16" }
+            }
+          },
+          "required": ["kind", "description", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "any" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "children": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": { "$ref": "#/$defs/__schema16" }
+            }
+          },
+          "required": ["kind", "description", "children"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "const": "not" },
+            "description": { "$ref": "#/$defs/__schema6" },
+            "child": { "$ref": "#/$defs/__schema16" }
+          },
+          "required": ["kind", "description", "child"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "__schema16": { "not": {} }
+  }
 }

@@ -18,6 +18,7 @@ describe('loadEnvironment', () => {
     expect(environment.bankAppBaseUrl).toBe('http://127.0.0.1:8080');
     expect(environment.browserHeadless).toBe(false);
     expect(environment.operatorPort).toBe(3210);
+    expect(environment.discoveryMaxModelCalls).toBe(30);
   });
 
   it('loads valid custom configuration', () => {
@@ -25,11 +26,13 @@ describe('loadEnvironment', () => {
     vi.stubEnv('BROWSER_HEADLESS', 'true');
     vi.stubEnv('OPERATOR_PORT', '4000');
     vi.stubEnv('OPENAI_MODEL', 'custom-model');
+    vi.stubEnv('DISCOVERY_MAX_ACTIONS', '9');
     const environment = loadEnvironment();
     expect(environment.bankAppBaseUrl).toBe('http://localhost:9090');
     expect(environment.browserHeadless).toBe(true);
     expect(environment.operatorPort).toBe(4000);
     expect(environment.openAiModel).toBe('custom-model');
+    expect(environment.discoveryMaxActions).toBe(9);
   });
 
   it('rejects invalid URLs and ports', () => {

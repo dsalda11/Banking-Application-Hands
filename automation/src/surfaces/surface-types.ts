@@ -1,6 +1,6 @@
 import type { CheckpointType } from '../domain/checkpoints.js';
 import type { CapabilityActionType } from '../domain/actions.js';
-import type { DiscoveryObservationType } from '../domain/discovery.js';
+import type { DiscoveryObservationType, DiscoveryTraceEventType } from '../domain/discovery.js';
 import type { EvidenceReferenceType } from '../domain/evidence.js';
 import type { ExecutionContext } from '../execution/execution-context.js';
 import type { SurfaceError } from './surface-errors.js';
@@ -85,5 +85,15 @@ export interface SurfaceAdapter {
   writeObservation(observation: DiscoveryObservationType): Promise<EvidenceReferenceType>;
   writeResult(result: unknown): Promise<EvidenceReferenceType>;
   writeEventLog(events: readonly SurfaceEvent[]): Promise<EvidenceReferenceType>;
+  writeDiscoveryTrace?(events: readonly DiscoveryTraceEventType[]): Promise<EvidenceReferenceType>;
+  /** Optional provider-owned continuity proof; never returns handles or storage values. */
+  captureSessionContinuityBaseline?(): Promise<void>;
+  verifySessionContinuity?(): Promise<{
+    sameBrowserSession: boolean;
+    sameContext: boolean;
+    samePage: boolean;
+    applicationSessionPreserved: boolean;
+  }>;
+  bringToFront?(): Promise<void>;
   close(): Promise<void>;
 }

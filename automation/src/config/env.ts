@@ -12,6 +12,8 @@ const optionalSecret = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 const portSchema = z.coerce.number().int().min(1).max(65535);
+const boundedInteger = (fallback: number, minimum: number, maximum: number) =>
+  z.coerce.number().int().min(minimum).max(maximum).default(fallback);
 const booleanSchema = z
   .string()
   .default('false')
@@ -33,6 +35,12 @@ const rawEnvironmentSchema = z.object({
   BANK_CUSTOMER_USERNAME: optionalSecret,
   OPENAI_API_KEY: optionalSecret,
   OPENAI_MODEL: z.string().trim().min(1).default('gpt-5.6-terra'),
+  DISCOVERY_SEND_SCREENSHOTS: booleanSchema,
+  DISCOVERY_MAX_MODEL_CALLS: boundedInteger(30, 1, 200),
+  DISCOVERY_MAX_ACTIONS: boundedInteger(30, 1, 200),
+  DISCOVERY_TIMEOUT_MS: boundedInteger(120000, 1000, 3_600_000),
+  DISCOVERY_MAX_REPEATED_STATES: boundedInteger(3, 1, 20),
+  DISCOVERY_MAX_CONSECUTIVE_FAILURES: boundedInteger(3, 1, 20),
   BROWSER_HEADLESS: booleanSchema,
   OPERATOR_HOST: z.string().trim().min(1).default('127.0.0.1'),
   OPERATOR_PORT: portSchema.default(3210),
@@ -58,6 +66,12 @@ export interface AutomationEnvironment {
   readonly bankCustomerUsername?: string;
   readonly openAiApiKey?: string;
   readonly openAiModel: string;
+  readonly discoverySendScreenshots: boolean;
+  readonly discoveryMaxModelCalls: number;
+  readonly discoveryMaxActions: number;
+  readonly discoveryTimeoutMs: number;
+  readonly discoveryMaxRepeatedStates: number;
+  readonly discoveryMaxConsecutiveFailures: number;
   readonly browserHeadless: boolean;
   readonly operatorHost: string;
   readonly operatorPort: number;
@@ -122,6 +136,12 @@ export function loadEnvironment(options: LoadEnvironmentOptions = {}): Automatio
       : {}),
     ...(openAiApiKey ? { openAiApiKey } : {}),
     openAiModel: parsed.OPENAI_MODEL,
+    discoverySendScreenshots: parsed.DISCOVERY_SEND_SCREENSHOTS,
+    discoveryMaxModelCalls: parsed.DISCOVERY_MAX_MODEL_CALLS,
+    discoveryMaxActions: parsed.DISCOVERY_MAX_ACTIONS,
+    discoveryTimeoutMs: parsed.DISCOVERY_TIMEOUT_MS,
+    discoveryMaxRepeatedStates: parsed.DISCOVERY_MAX_REPEATED_STATES,
+    discoveryMaxConsecutiveFailures: parsed.DISCOVERY_MAX_CONSECUTIVE_FAILURES,
     browserHeadless: parsed.BROWSER_HEADLESS,
     operatorHost: parsed.OPERATOR_HOST,
     operatorPort: parsed.OPERATOR_PORT,

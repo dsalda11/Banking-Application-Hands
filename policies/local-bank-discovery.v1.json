@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "local-bank-discovery",
+  "version": "1.0.0",
+  "description": "Fail-closed bounded discovery policy for the local read-only banking workflow.",
+  "allowedOrigins": ["http://127.0.0.1:8080"],
+  "allowedRoutes": [
+    { "id": "login", "pattern": "^/index$" },
+    { "id": "staff", "pattern": "^/staff$" },
+    { "id": "customers", "pattern": "^/showcust$" },
+    { "id": "details", "pattern": "^/getDetails$" }
+  ],
+  "allowedActions": ["navigate", "activate", "enterText", "pressKey", "scroll", "extract"],
+  "deniedActions": ["selectOption", "wait"],
+  "riskByAction": {
+    "navigate": "navigation",
+    "activate": "read",
+    "enterText": "input",
+    "selectOption": "prohibited",
+    "pressKey": "input",
+    "scroll": "read",
+    "wait": "prohibited",
+    "extract": "read"
+  },
+  "allowedSecretReferences": ["BANK_STAFF_USERNAME", "BANK_STAFF_PASSWORD"],
+  "allowedSecretStepIds": [
+    "discovery-enterSecret",
+    "step-002-enter-text",
+    "step-003-enter-text"
+  ],
+  "screenshotRules": { "enabled": false, "forbidWhileSecretFieldPopulated": true },
+  "traceRules": { "enabled": false, "startAfterAuthentication": true },
+  "navigation": { "allowExternal": false, "maxNavigations": 10 },
+  "downloads": "deny",
+  "uploads": "deny",
+  "maxReplayDurationMs": 120000,
+  "maxActionAttempts": 1,
+  "authenticationRecovery": { "allowed": false, "maxAttempts": 1 },
+  "interventionActions": [],
+  "interventionStepIds": [],
+  "defaultDecision": "deny",
+  "metadata": { "createdAt": "2026-09-30T00:00:00Z" }
+}

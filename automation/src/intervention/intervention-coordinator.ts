@@ -48,6 +48,12 @@ export type ReplayInterventionDecision =
   | { readonly kind: 'abort'; readonly interventionId: string; readonly leaseGeneration: number }
   | { readonly kind: 'timeout'; readonly interventionId: string; readonly leaseGeneration: number }
   | {
+      readonly kind: 'interrupted';
+      readonly interventionId: string;
+      readonly leaseGeneration: number;
+      readonly source: 'SIGINT' | 'SIGTERM';
+    }
+  | {
       readonly kind: 'browserSessionLost';
       readonly interventionId: string;
       readonly leaseGeneration: number;
@@ -55,6 +61,7 @@ export type ReplayInterventionDecision =
 
 export interface LeaseBoundInterventionCoordinator extends InterventionCoordinator {
   bindLease(lease: ControlLeaseManager): void;
+  interrupt(source: 'SIGINT' | 'SIGTERM'): Promise<void>;
   close(): Promise<void>;
 }
 export interface ValidationReportingCoordinator {
@@ -118,11 +125,16 @@ export class AutomationActionGuard {
   private generation: number;
   private aborted = false;
 
-  constructor(readonly lease: ControlLeaseManager) {
+  constructor(
+    readonly lease: ControlLeaseManager,
+    private readonly cancellationSignal?: AbortSignal,
+  ) {
     this.generation = lease.snapshot().generation;
   }
 
   assertCanAct(): void {
+    if (this.cancellationSignal?.aborted)
+      throw new LeaseError('INTERRUPTED_BY_SIGNAL', 'Replay was interrupted at a safe boundary');
     if (this.aborted) throw new LeaseError('RUN_ABORTED', 'Replay was aborted by a human');
     this.lease.assertAutomation(this.generation);
   }
@@ -185,6 +197,8 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   private validationState: CoordinatorSnapshot['validationState'] = 'idle';
   private validationCommand: CoordinatorSnapshot['validationCommand'];
   private terminal = false;
+  private interruptedSource: 'SIGINT' | 'SIGTERM' | undefined;
+  private closePromise: Promise<void> | undefined;
   private lastCommandResult: string | undefined;
   private expiryTimer: unknown;
   private expiryGeneration: number | undefined;
@@ -266,15 +280,37 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   }
 
   async close(): Promise<void> {
-    if (this.terminal) return;
+    this.closePromise ??= (async () => {
+      this.clearExpiryTimer();
+      this.decisions.close();
+      this.token = undefined;
+      if (this.server) await this.server.close();
+      this.server = undefined;
+      this.terminal = true;
+      this.record('operator_server_stopped', 'Operator server stopped');
+      this.request = undefined;
+      this.publish(this.validationState);
+      this.waiters.clear();
+    })();
+    await this.closePromise;
+  }
+
+  async interrupt(source: 'SIGINT' | 'SIGTERM'): Promise<void> {
+    if (this.interruptedSource) return;
+    this.interruptedSource = source;
+    const lease = this.requireLease().snapshot();
+    const request = this.requireRequest();
     this.clearExpiryTimer();
-    this.decisions.close();
-    this.request = undefined;
-    this.token = undefined;
-    if (this.server) await this.server.close();
-    this.server = undefined;
+    this.validationInProgress = false;
+    this.lastCommandResult = 'interrupted_by_signal';
+    this.record('shutdown_signal_received', `Interactive replay interrupted by ${source}`, lease);
+    this.decisions.close({
+      kind: 'interrupted',
+      interventionId: request.interventionId,
+      leaseGeneration: lease.generation,
+      source,
+    });
     this.terminal = true;
-    this.record('operator_server_stopped', 'Operator server stopped');
     this.publish(this.validationState);
   }
 
@@ -346,6 +382,7 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   private async submitResume(
     generation: number,
   ): Promise<{ lease: ControlLease; message?: string }> {
+    this.assertActive();
     this.assertNoValidationInProgress();
     const lease = this.requireLease();
     const requested = lease.handoffToAutomation(this.requireToken(), generation);
@@ -365,9 +402,10 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   private async submitComplete(
     generation: number,
   ): Promise<{ lease: ControlLease; message?: string }> {
+    this.assertActive();
     this.assertNoValidationInProgress();
     const lease = this.requireLease();
-    const requested = lease.beginResume(this.requireToken(), generation);
+    const requested = lease.handoffToAutomation(this.requireToken(), generation);
     this.clearExpiryTimer();
     this.validationInProgress = true;
     this.validationCommand = 'complete';
@@ -385,6 +423,7 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   }
 
   private async submitAbort(generation: number): Promise<ControlLease> {
+    this.assertActive();
     this.assertNoValidationInProgress();
     const lease = this.requireLease();
     const aborted = lease.abort(this.requireToken(), generation);
@@ -399,6 +438,7 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   }
 
   private claim(): ControlLease {
+    this.assertActive();
     const claimed = this.requireLease().claim(this.requireToken(), 'local-operator', this.ttlMs);
     this.lastCommandResult = 'claim_accepted';
     this.armExpiryTimer(claimed);
@@ -408,6 +448,7 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   }
 
   private heartbeat(generation: number): ControlLease {
+    this.assertActive();
     const renewed = this.requireLease().heartbeat(this.requireToken(), generation, this.ttlMs);
     this.lastCommandResult = 'heartbeat_accepted';
     this.armExpiryTimer(renewed);
@@ -417,6 +458,7 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
   }
 
   private reclaim(): ControlLease {
+    this.assertActive();
     const lease = this.observeLease();
     if (lease.state !== 'LEASE_EXPIRED')
       throw new LeaseError('LEASE_NOT_EXPIRED', 'Human control may be reclaimed only after expiry');
@@ -505,6 +547,11 @@ export class OperatorInterventionCoordinator implements LeaseBoundInterventionCo
         'VALIDATION_IN_PROGRESS',
         'Another validation command is already active',
       );
+  }
+
+  private assertActive(): void {
+    if (this.interruptedSource || this.terminal)
+      throw new LeaseError('INTERVENTION_TERMINAL', 'Intervention is no longer active');
   }
 
   private publish(state: CoordinatorSnapshot['validationState']): void {

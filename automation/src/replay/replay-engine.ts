@@ -9,6 +9,8 @@ import type { EvidenceReferenceType } from '../domain/evidence.js';
 import type { ExecutionContext } from '../execution/execution-context.js';
 import { SurfaceError } from '../surfaces/surface-errors.js';
 import type { SurfaceAdapter, SurfaceEvent } from '../surfaces/surface-types.js';
+import { sanitizeObservation } from '../surfaces/web/observation-collector.js';
+import { DiscoveryObservation, type DiscoveryObservationType } from '../domain/discovery.js';
 import { ArtifactLoadError, type LoadedArtifact } from './artifact-loader.js';
 import { RuntimeBindingError, validateRuntimeBindings } from './runtime-bindings.js';
 import { PolicyDecisionError, PolicyEngine } from '../policy/policy-engine.js';
@@ -38,6 +40,9 @@ export interface ReplayOptions {
   readonly leaseNow?: () => number;
   /** Step 8A seam; Step 8B supplies the local operator-server implementation. */
   readonly interventionCoordinator?: InterventionCoordinator;
+  /** External cancellation is observed only at safe action boundaries. */
+  readonly cancellationSignal?: AbortSignal;
+  readonly interruptionSource?: () => 'SIGINT' | 'SIGTERM' | undefined;
 }
 
 class ReplayError extends Error {
@@ -121,6 +126,17 @@ function canRetry(step: CapabilityStepType, code: string): boolean {
   return step.recovery.kind === 'retry' && step.recovery.retryableErrorCodes.includes(code);
 }
 
+function sanitizedEvidenceObservation(
+  observation: DiscoveryObservationType,
+  confidentialValues: readonly string[],
+): DiscoveryObservationType {
+  // SurfaceAdapter promises the typed shape. Keeping the safe-parse fallback
+  // preserves deliberately minimal test adapters without weakening production.
+  return DiscoveryObservation.safeParse(observation).success
+    ? sanitizeObservation(observation, confidentialValues)
+    : observation;
+}
+
 function localEvidenceReference(
   root: string,
   filePath: string,
@@ -167,6 +183,14 @@ async function writePreflightResult(
 }
 
 export class ReplayEngine {
+  private assertNotCancelled(options: ReplayOptions): void {
+    if (options.cancellationSignal?.aborted)
+      throw new ReplayError(
+        'INTERRUPTED_BY_SIGNAL',
+        `Interactive replay interrupted by ${options.interruptionSource?.() ?? 'SIGINT'}`,
+      );
+  }
+
   async run(options: ReplayOptions): Promise<RunResultType> {
     const runId = `replay-${randomUUID()}`;
     const { artifact, contentHash } = options.loadedArtifact;
@@ -191,7 +215,7 @@ export class ReplayEngine {
     );
     if (options.interventionCoordinator && 'bindLease' in options.interventionCoordinator)
       (options.interventionCoordinator as LeaseBoundInterventionCoordinator).bindLease(lease);
-    const guard = new AutomationActionGuard(lease);
+    const guard = new AutomationActionGuard(lease, options.cancellationSignal);
     let lastCompletedStepId: string | undefined;
 
     try {
@@ -208,6 +232,7 @@ export class ReplayEngine {
         ...(options.logger ? { logger: options.logger } : {}),
       };
       context = replayContext;
+      this.assertNotCancelled(options);
       events.push({
         timestamp: new Date().toISOString(),
         eventType: 'policy_loaded',
@@ -237,6 +262,7 @@ export class ReplayEngine {
       });
       surfaceStarted = true;
       for (const precondition of artifact.preconditions) {
+        this.assertNotCancelled(options);
         guard.assertCanAct();
         const result = await options.adapter.evaluateCheckpoint(precondition, context);
         events.push({
@@ -252,6 +278,7 @@ export class ReplayEngine {
       }
 
       for (const step of artifact.steps) {
+        this.assertNotCancelled(options);
         const result = await this.executeStep(
           step,
           artifact,
@@ -295,7 +322,12 @@ export class ReplayEngine {
         );
         lastCompletedStepId = step.id;
         if (result.outcome) {
-          const evidence = await this.finishEvidence(options.adapter, events, trace);
+          const evidence = await this.finishEvidence(
+            options.adapter,
+            events,
+            trace,
+            Object.values(options.secrets),
+          );
           if (result.outcome.result === 'permissionDenied') {
             const permissionResult: RunResultType = {
               status: 'permissionDenied',
@@ -339,6 +371,7 @@ export class ReplayEngine {
       if (!context)
         throw new ReplayError('REPLAY_CONTEXT_MISSING', 'Replay context was not initialized');
       guard.assertCanAct();
+      this.assertNotCancelled(options);
       const success = await options.adapter.evaluateCheckpoint(artifact.success, replayContext);
       events.push({
         timestamp: new Date().toISOString(),
@@ -359,7 +392,10 @@ export class ReplayEngine {
       guard.assertCanAct();
       const screenshot = await options.adapter.captureScreenshot({ name: 'replay-final' });
       guard.assertCanAct();
-      const observation = await options.adapter.observe();
+      const observation = sanitizedEvidenceObservation(
+        await options.adapter.observe(),
+        Object.values(options.secrets),
+      );
       const observationEvidence = await options.adapter.writeObservation(observation);
       trace = startedTrace ? await options.adapter.stopTrace() : undefined;
       const evidence = [screenshot, observationEvidence, ...(trace ? [trace] : [])];
@@ -373,6 +409,13 @@ export class ReplayEngine {
         evidence,
         completedAt: new Date().toISOString(),
       };
+      events.push({
+        timestamp: new Date().toISOString(),
+        eventType: 'run_succeeded',
+        action: 'run',
+        reason: 'Replay completed successfully.',
+        ok: true,
+      });
       if (options.interventionCoordinator && 'close' in options.interventionCoordinator) {
         await (options.interventionCoordinator as LeaseBoundInterventionCoordinator).close();
         coordinatorClosed = true;
@@ -424,9 +467,16 @@ export class ReplayEngine {
         this.appendCoordinatorEvents(events, options.interventionCoordinator);
         events.push({
           timestamp: new Date().toISOString(),
-          eventType: failure.code === 'ABORTED_BY_HUMAN' ? 'run_aborted' : 'run_failed',
+          eventType:
+            failure.code === 'ABORTED_BY_HUMAN'
+              ? 'run_aborted'
+              : failure.code === 'COMPLETED_BY_HUMAN'
+                ? 'run_succeeded'
+                : failure.code === 'INTERRUPTED_BY_SIGNAL'
+                  ? 'run_interrupted'
+                  : 'run_failed',
           action: 'run',
-          ok: false,
+          ok: failure.code === 'COMPLETED_BY_HUMAN',
           errorCode: failure.code,
           reason: failure.message,
         });
@@ -464,36 +514,48 @@ export class ReplayEngine {
               evidence: [...failureEvidence, ...(trace ? [trace] : [])],
               completedAt: new Date().toISOString(),
             }
-          : specialCode === 'INTERVENTION_REQUIRED'
+          : specialCode === 'INTERRUPTED_BY_SIGNAL'
             ? {
-                status: 'needsHuman',
+                status: 'interrupted',
                 runId,
-                interventionId: `control-${runId}`,
-                currentStepId: failure.stepId ?? 'unknown-step',
-                reasonCode: 'INTERVENTION_REQUIRED',
+                artifactId: artifact.id,
+                artifactVersion: artifact.version,
+                artifactHash: contentHash,
+                code: 'INTERRUPTED_BY_SIGNAL',
+                signal: options.interruptionSource?.() ?? 'SIGINT',
                 evidence: [...failureEvidence, ...(trace ? [trace] : [])],
+                completedAt: new Date().toISOString(),
               }
-            : specialCode === 'ABORTED_BY_HUMAN'
+            : specialCode === 'INTERVENTION_REQUIRED'
               ? {
-                  status: 'aborted',
+                  status: 'needsHuman',
                   runId,
-                  artifactId: artifact.id,
-                  artifactVersion: artifact.version,
-                  artifactHash: contentHash,
-                  code: 'ABORTED_BY_HUMAN',
+                  interventionId: `control-${runId}`,
+                  currentStepId: failure.stepId ?? 'unknown-step',
+                  reasonCode: 'INTERVENTION_REQUIRED',
                   evidence: [...failureEvidence, ...(trace ? [trace] : [])],
-                  completedAt: new Date().toISOString(),
                 }
-              : {
-                  status: 'failure',
-                  runId,
-                  artifactId: artifact.id,
-                  artifactVersion: artifact.version,
-                  artifactHash: contentHash,
-                  error: failure,
-                  evidence: [...failureEvidence, ...(trace ? [trace] : [])],
-                  completedAt: new Date().toISOString(),
-                };
+              : specialCode === 'ABORTED_BY_HUMAN'
+                ? {
+                    status: 'aborted',
+                    runId,
+                    artifactId: artifact.id,
+                    artifactVersion: artifact.version,
+                    artifactHash: contentHash,
+                    code: 'ABORTED_BY_HUMAN',
+                    evidence: [...failureEvidence, ...(trace ? [trace] : [])],
+                    completedAt: new Date().toISOString(),
+                  }
+                : {
+                    status: 'failure',
+                    runId,
+                    artifactId: artifact.id,
+                    artifactVersion: artifact.version,
+                    artifactHash: contentHash,
+                    error: failure,
+                    evidence: [...failureEvidence, ...(trace ? [trace] : [])],
+                    completedAt: new Date().toISOString(),
+                  };
       try {
         if (surfaceStarted) await options.adapter.writeResult(result);
         else
@@ -573,7 +635,9 @@ export class ReplayEngine {
       reason: decision.reason,
       ok: true,
     });
-    let pausedGeneration = guard.requestPause();
+    await args.adapter.captureSessionContinuityBaseline?.();
+    await args.adapter.bringToFront?.();
+    const pausedGeneration = guard.requestPause();
     events.push({
       timestamp: new Date().toISOString(),
       eventType: 'safe_boundary_reached',
@@ -627,6 +691,7 @@ export class ReplayEngine {
     for (;;) {
       const response: ReplayInterventionDecision =
         await args.options.interventionCoordinator.awaitDecision(request);
+      this.assertNotCancelled(args.options);
       if (
         response.interventionId !== interventionId ||
         (response.kind !== 'abort' && !guard.acceptsDecisionGeneration(response.leaseGeneration))
@@ -652,6 +717,11 @@ export class ReplayEngine {
         });
         throw new ReplayError('ABORTED_BY_HUMAN', 'Replay was aborted by a human operator');
       }
+      if (response.kind === 'interrupted')
+        throw new ReplayError(
+          'INTERRUPTED_BY_SIGNAL',
+          `Interactive replay interrupted by ${response.source}`,
+        );
       if (response.kind === 'complete') {
         events.push({
           timestamp: new Date().toISOString(),
@@ -660,11 +730,56 @@ export class ReplayEngine {
           action: 'intervention',
           ok: true,
         });
-        const complete = await args.adapter.evaluateCheckpoint(args.artifact.success, args.context);
+        guard.resume(response.leaseGeneration);
+        guard.assertCanAct();
+        const pendingState = await args.adapter.evaluateCheckpoint(step.checkpoint, args.context);
+        let extractionPassed = pendingState.passed;
+        if (extractionPassed) {
+          for (const outputStep of args.artifact.steps.filter(
+            (candidate) =>
+              candidate.action.kind === 'extract' &&
+              candidate.action.output in args.artifact.contract.outputs &&
+              !(candidate.action.output in args.context.outputs),
+          )) {
+            guard.assertCanAct();
+            const extractionPolicy = new PolicyEngine(
+              args.options.loadedPolicy.policy,
+              args.options.loadedPolicy.contentHash,
+            ).decide(outputStep.action, outputStep, args.runId, 1, 0, 0);
+            if (extractionPolicy.decision !== 'allow') {
+              extractionPassed = false;
+              break;
+            }
+            const extracted = await args.adapter.execute(outputStep.action, {
+              ...args.context,
+              stepId: outputStep.id,
+            });
+            events.push({
+              timestamp: new Date().toISOString(),
+              eventType: 'human_completion_output_extracted',
+              stepId: outputStep.id,
+              action: outputStep.action.kind,
+              policyDecision: extractionPolicy.decision,
+              policyId: extractionPolicy.policyId,
+              policyVersion: extractionPolicy.policyVersion,
+              policyHash: extractionPolicy.policyHash,
+              ok: extracted.ok,
+              ...(extracted.error ? { errorCode: extracted.error.code } : {}),
+            });
+            if (!extracted.ok) {
+              extractionPassed = false;
+              break;
+            }
+          }
+        }
+        const complete = extractionPassed
+          ? await args.adapter.evaluateCheckpoint(args.artifact.success, args.context)
+          : pendingState;
+        this.assertNotCancelled(args.options);
         const outputsPresent = Object.keys(args.artifact.contract.outputs).every(
           (name) => name in args.context.outputs,
         );
-        if (!complete.passed || !outputsPresent) {
+        if (!extractionPassed || !complete.passed || !outputsPresent) {
           events.push({
             timestamp: new Date().toISOString(),
             eventType: 'completion_rejected',
@@ -673,11 +788,11 @@ export class ReplayEngine {
             reason: 'Declared final checkpoint or required outputs are not satisfied.',
             ok: false,
           });
-          guard.rejectResume(response.leaseGeneration);
-          pausedGeneration = await this.restoreHumanOwnership(
+          const rejectedGeneration = guard.requestPause();
+          await this.restoreHumanOwnership(
             args.options.interventionCoordinator,
             'Completion validation failed.',
-            pausedGeneration,
+            rejectedGeneration,
           );
           continue;
         }
@@ -689,6 +804,16 @@ export class ReplayEngine {
           action: 'intervention',
           ok: true,
         });
+        const continuity = await args.adapter.verifySessionContinuity?.();
+        if (continuity)
+          events.push({
+            timestamp: new Date().toISOString(),
+            eventType: 'session_continuity_verified',
+            stepId: step.id,
+            action: 'session',
+            observed: continuity,
+            ok: Object.values(continuity).every(Boolean),
+          });
         this.validationFinished(args.options.interventionCoordinator);
         throw new ReplayError('COMPLETED_BY_HUMAN', 'Human completion was verified');
       }
@@ -734,6 +859,7 @@ export class ReplayEngine {
       // declared postcondition. A failed validation returns to PAUSED instead
       // of retrying an action the operator may have partially performed.
       const postcondition = await args.adapter.evaluateCheckpoint(step.checkpoint, args.context);
+      this.assertNotCancelled(args.options);
       if (!postcondition.passed) {
         events.push({
           timestamp: new Date().toISOString(),
@@ -743,11 +869,11 @@ export class ReplayEngine {
           reason: 'The pending action postcondition is not satisfied.',
           ok: false,
         });
-        pausedGeneration = guard.requestPause();
-        pausedGeneration = await this.restoreHumanOwnership(
+        const rejectedGeneration = guard.requestPause();
+        await this.restoreHumanOwnership(
           args.options.interventionCoordinator,
           'Resume validation failed.',
-          pausedGeneration,
+          rejectedGeneration,
         );
         continue;
       }
@@ -769,6 +895,16 @@ export class ReplayEngine {
         risk: reevaluated.risk,
         ok: true,
       });
+      const continuity = await args.adapter.verifySessionContinuity?.();
+      if (continuity)
+        events.push({
+          timestamp: new Date().toISOString(),
+          eventType: 'session_continuity_verified',
+          stepId: step.id,
+          action: 'session',
+          observed: continuity,
+          ok: Object.values(continuity).every(Boolean),
+        });
       this.validationFinished(args.options.interventionCoordinator);
       return 'satisfied';
     }
@@ -1131,9 +1267,10 @@ export class ReplayEngine {
     adapter: SurfaceAdapter,
     events: readonly SurfaceEvent[],
     trace: EvidenceReferenceType | undefined,
+    confidentialValues: readonly string[],
   ): Promise<EvidenceReferenceType[]> {
     const screenshot = await adapter.captureScreenshot({ name: 'replay-business-outcome' });
-    const observation = await adapter.observe();
+    const observation = sanitizedEvidenceObservation(await adapter.observe(), confidentialValues);
     const observationEvidence = await adapter.writeObservation(observation);
     const stoppedTrace = trace ?? (await adapter.stopTrace());
     const eventEvidence = await adapter.writeEventLog(events);

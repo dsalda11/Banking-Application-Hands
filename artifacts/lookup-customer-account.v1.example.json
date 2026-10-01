@@ -490,9 +490,20 @@
       "risk": "read",
       "timeoutMs": 15000,
       "checkpoint": {
-        "kind": "textPresent",
-        "description": "The customer details page displays the account field.",
-        "text": "Account No."
+        "kind": "all",
+        "description": "The customer details route displays the account field.",
+        "children": [
+          {
+            "kind": "urlMatches",
+            "description": "The browser is on the customer details route.",
+            "pattern": "/getDetails"
+          },
+          {
+            "kind": "textPresent",
+            "description": "The customer details page displays the account field.",
+            "text": "Account No."
+          }
+        ]
       },
       "recovery": {
         "kind": "retry",

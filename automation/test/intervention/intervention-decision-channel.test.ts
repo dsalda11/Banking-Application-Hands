@@ -6,7 +6,9 @@ import {
 } from '../../src/intervention/intervention-decision-channel.js';
 import type { ReplayInterventionDecision } from '../../src/intervention/intervention-coordinator.js';
 
-const decision = (kind: ReplayInterventionDecision['kind']): ReplayInterventionDecision => ({
+const decision = (
+  kind: Exclude<ReplayInterventionDecision['kind'], 'interrupted'>,
+): ReplayInterventionDecision => ({
   kind,
   interventionId: 'intervention-test',
   leaseGeneration: 7,

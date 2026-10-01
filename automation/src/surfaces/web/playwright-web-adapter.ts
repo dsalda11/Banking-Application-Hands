@@ -1,7 +1,9 @@
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import type { Browser, BrowserContext, Page } from 'playwright';
 import type { CapabilityActionType } from '../../domain/actions.js';
 import type { CheckpointType } from '../../domain/checkpoints.js';
-import type { DiscoveryObservationType } from '../../domain/discovery.js';
+import type { DiscoveryObservationType, DiscoveryTraceEventType } from '../../domain/discovery.js';
 import type { EvidenceReferenceType } from '../../domain/evidence.js';
 import type { ExecutionContext } from '../../execution/execution-context.js';
 import { applyTransform } from '../../execution/apply-transform.js';
@@ -37,6 +39,8 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
   private tracing = false;
   private observationNumber = 0;
   private traceName = 'surface-trace.zip';
+  private continuityBaseline:
+    { browser: Browser; context: BrowserContext; page: Page; cookieHash: string } | undefined;
 
   async start(options: SurfaceStartOptions): Promise<void> {
     this.evidenceDirectory = await prepareEvidenceDirectory(
@@ -313,6 +317,63 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
       'eventLog',
       'application/x-ndjson',
     );
+  }
+  async writeDiscoveryTrace(
+    events: readonly DiscoveryTraceEventType[],
+  ): Promise<EvidenceReferenceType> {
+    const filePath = path.join(this.evidenceDirectory, 'discovery-events.jsonl');
+    await writeJsonLines(filePath, events);
+    return evidenceReference(
+      path.resolve(this.evidenceDirectory, '../../..'),
+      filePath,
+      'eventLog',
+      'application/x-ndjson',
+    );
+  }
+  async captureSessionContinuityBaseline(): Promise<void> {
+    const browser = this.session.browser;
+    const context = this.session.context;
+    const page = this.session.page;
+    if (!browser || !context || !page)
+      throw new SurfaceError('SURFACE_NOT_STARTED', 'Surface session is not active');
+    this.continuityBaseline = {
+      browser,
+      context,
+      page,
+      cookieHash: this.cookieHash(await context.cookies()),
+    };
+    await page.bringToFront();
+  }
+  async verifySessionContinuity() {
+    const baseline = this.continuityBaseline;
+    const context = this.session.context;
+    return {
+      sameBrowserSession: Boolean(baseline && baseline.browser === this.session.browser),
+      sameContext: Boolean(baseline && baseline.context === context),
+      samePage: Boolean(baseline && baseline.page === this.session.page),
+      applicationSessionPreserved: Boolean(
+        baseline && context && baseline.cookieHash === this.cookieHash(await context.cookies()),
+      ),
+    };
+  }
+  async bringToFront(): Promise<void> {
+    await this.page().bringToFront();
+  }
+  private cookieHash(cookies: Awaited<ReturnType<BrowserContext['cookies']>>): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify(
+          cookies
+            .map(({ name, value, domain, path: cookiePath }) => ({
+              name,
+              value,
+              domain,
+              path: cookiePath,
+            }))
+            .sort((left, right) => left.name.localeCompare(right.name)),
+        ),
+      )
+      .digest('hex');
   }
   async close(): Promise<void> {
     await this.session.close();

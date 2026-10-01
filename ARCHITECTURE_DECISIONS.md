@@ -556,7 +556,75 @@ The project is not assignment-complete until one **real LLM discovery** creates 
 
 If time remains after the core, the best single stretch goal is **multi-run stability** because it directly measures whether deterministic replay is actually reliable. The next best is a small read-only capability catalog endpoint.
 
-## 16. Decision sources
+### Interactive process lifecycle
+
+One production lifecycle owner registers `SIGINT`/`SIGTERM`, owns the cancellation controller, and
+shares one cleanup promise. Cancellation is checked at replay safe boundaries and never interrupts an
+in-flight surface operation. Exit codes are 130 for `SIGINT` and 143 for `SIGTERM`, set only after
+cleanup. Validation rejection creates a new human fencing generation, and the operator page rejects
+older coordinator revisions. Controlled child-process tests verify graceful signal handling and
+loopback-port release. The lease and lifecycle remain deliberately single-process; Step 8C will prove
+same-session control against the real target Chromium browser.
+
+### Real-browser takeover acceptance
+
+Step 8C keeps the exact Playwright browser process, BrowserContext, target Page, cookie jar, and
+application session inside one replay invocation. Test-only human interaction acts directly on that
+existing Page and is permitted only while the human lease is active. Domain contracts expose no
+Playwright handles or storage values. Continuity evidence contains booleans only, derived from object
+identity and an in-memory cookie digest. Invalid Resume remains paused, valid Resume skips an
+already-satisfied action, verified Complete may execute only missing policy-allowed read-only
+extraction, and Abort remains a typed non-crash result. Remote operators would require authenticated
+transport and durable distributed leases without weakening these rules.
+
+### Bounded LLM discovery
+
+The model is a planner, not a browser controller. `PlannerClient` receives a declared goal, bounded
+sanitized observation, remaining budgets, and short safe history, then returns one strict proposal.
+Application code performs schema validation, observation-fingerprint validation, policy evaluation,
+secret-reference resolution, surface execution, and result observation. This prevents model output
+or prompt injection in page content from granting tools, changing policy, expanding budgets, or
+inventing executable selectors.
+
+The OpenAI implementation uses the Responses API, strict JSON Schema, no tools, `store: false`, and
+typed provider failures. Tests use a deterministic scripted planner and require no network. State and
+state/action fingerprints provide deterministic no-progress and alternating-loop termination.
+Discovery traces keep proposal, authorization, execution, and observed outcome as separate records;
+they exclude raw provider payloads, secrets, cookies, storage, raw DOM, and traces.
+
+Human intervention reuses the Step 8 coordinator and control lease in the same browser session.
+After Resume, discovery discards all old observation element IDs and observes again. A policy-required
+intervention authorizes at most one structurally identical action; a different proposal requires a
+new decision. The current implementation remains local and single-process. Remote production use
+would add organizational identity, authenticated transport, durable fencing, and institution-specific
+provider retention controls without transferring raw browser storage.
+
+## 16. Deterministic trace compilation and artifact lifecycle
+
+Compilation is a pure, provider-independent transformation from a validated goal and compatible
+integrity-bound traces to canonical capability JSON. It does not receive a browser, planner,
+application source tree, database connection, or an existing artifact. Sanitized semantic observation
+payloads are retained because selector provenance cannot be proved from target descriptions alone.
+Raw DOM, storage, cookies, provider payloads, operator tokens, and secret values remain forbidden.
+
+The terminal trace event commits to all preceding events. Acceptance requires contiguous ordering,
+stable run/goal/policy identity, observed execution and postconditions, typed output extraction, and
+either verified goal success or a declared business outcome. Multiple traces merge only when their
+goal and policy hashes match. Failed, denied, stale, ambiguous, no-progress, aborted, and commentary
+events are diagnostics, never executable steps.
+
+Artifact bytes are deterministic and exclude compilation time. Provenance is a separate immutable
+manifest containing trace/policy/goal hashes, selected steps, discarded events, and locator reasoning.
+Lifecycle records are also separate: explicit review binds an artifact hash; fresh model-free replay
+binds both artifact and review hashes; promotion requires those records, uses an exclusive copy, and
+reloads the active registry. This keeps drafts invisible to normal registry discovery and prevents
+tests, approval, or successful discovery from silently activating an artifact.
+
+Fake-planner and genuine-model origins are not interchangeable provenance. Offline fixture and local
+banking acceptance can prove the entire compiler/replay mechanism, while genuine OpenAI evidence
+remains pending until a real provider-backed trace succeeds under explicitly authorized data handling.
+
+## 17. Decision sources
 
 - The assignment's Sections 3, 5, and 7 make the artifact contract, replay/error model, real human handoff, safety, and complete vertical slice the primary design drivers.
 - Playwright recommends user-facing locators and supplies frame-aware locator composition, auto-waiting/actionability, BrowserContexts, and traces: <https://playwright.dev/docs/locators>, <https://playwright.dev/docs/actionability>, <https://playwright.dev/docs/browser-contexts>, <https://playwright.dev/docs/trace-viewer>.

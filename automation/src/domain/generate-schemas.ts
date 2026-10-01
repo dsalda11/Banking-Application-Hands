@@ -5,7 +5,7 @@ import prettier from 'prettier';
 import { z } from 'zod';
 
 import { CapabilityArtifact } from './artifact.js';
-import { DiscoveryDecision } from './discovery.js';
+import { DiscoveryDecision, DiscoveryGoal } from './discovery.js';
 import { DiscoveryEvent } from './events.js';
 import { InterventionRequest } from './intervention.js';
 import { RunResult } from './run-result.js';
@@ -15,6 +15,7 @@ const schemaDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 const definitions: readonly (readonly [string, z.ZodTypeAny])[] = [
   ['capability-artifact', CapabilityArtifact],
   ['discovery-decision', DiscoveryDecision],
+  ['discovery-goal', DiscoveryGoal],
   ['discovery-event', DiscoveryEvent],
   ['intervention-request', InterventionRequest],
   ['run-result', RunResult],
@@ -42,7 +43,7 @@ const stringSchema = (pattern?: string): JsonSchemaDocument => ({
   ...(pattern ? { pattern } : {}),
 });
 
-function reviewSchema(name: string): JsonSchemaDocument {
+function reviewSchema(name: string, schema: z.ZodTypeAny): JsonSchemaDocument {
   const envelope = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: `https://interface.ai/schemas/${name}.schema.json`,
@@ -118,28 +119,12 @@ function reviewSchema(name: string): JsonSchemaDocument {
     };
   }
   if (name === 'discovery-decision') {
-    return {
-      ...envelope,
-      oneOf: [
-        strictObject(['kind', 'reason', 'action'], {
-          kind: { const: 'action' },
-          reason: stringSchema(),
-          action: { type: 'object' },
-        }),
-        strictObject(['kind', 'summary', 'candidateOutputs', 'successEvidence'], {
-          kind: { const: 'complete' },
-          summary: stringSchema(),
-          candidateOutputs: { type: 'object' },
-          successEvidence: { type: 'object' },
-        }),
-        strictObject(['kind', 'reasonCode', 'explanation', 'currentStateSummary'], {
-          kind: { const: 'requestHuman' },
-          reasonCode: stringSchema(),
-          explanation: stringSchema(),
-          currentStateSummary: stringSchema(),
-        }),
-      ],
-    };
+    return toJsonSchema(schema, {
+      target: 'draft-2020-12',
+      io: 'input',
+      cycles: 'ref',
+      reused: 'ref',
+    });
   }
   return {
     ...envelope,
@@ -162,9 +147,12 @@ async function schemaFor(name: string, schema: z.ZodTypeAny): Promise<string> {
   // Zod's emitter expands recursive discriminated unions aggressively. The runtime Zod schemas remain authoritative;
   // these stable review projections keep the checked-in documents finite and machine-readable.
   const document =
-    name === 'intervention-request' || name === 'run-result' || name === 'replay-policy'
+    name === 'intervention-request' ||
+    name === 'run-result' ||
+    name === 'replay-policy' ||
+    name === 'discovery-goal'
       ? toJsonSchema(schema, { target: 'draft-2020-12', io: 'input', cycles: 'ref', reused: 'ref' })
-      : reviewSchema(name);
+      : reviewSchema(name, schema);
   return prettier.format(JSON.stringify(document), { parser: 'json', printWidth: 100 });
 }
 
