@@ -51,11 +51,20 @@ describe('loadEnvironment', () => {
   });
 
   it('requires OpenAI credentials only when requested', () => {
-    expect(() => loadEnvironment({ requireOpenAI: true })).toThrow('OPENAI_API_KEY');
+    expect(() => loadEnvironment({ requireOpenAI: true })).toThrow(
+      'Missing required environment variable: OPENAI_API_KEY',
+    );
   });
 
   it('requires banking credentials only when requested', () => {
-    expect(() => loadEnvironment({ requireBankCredentials: true })).toThrow('BANK_STAFF_USERNAME');
+    expect(() => loadEnvironment({ requireBankCredentials: true })).toThrow(
+      'Missing required environment variable: BANK_STAFF_USERNAME',
+    );
+  });
+
+  it('uses the process environment and does not load repository-local dotenv files', () => {
+    vi.stubEnv('OPENAI_MODEL', 'runtime-model');
+    expect(loadEnvironment().openAiModel).toBe('runtime-model');
   });
 
   it('does not expose secret values in validation errors', () => {

@@ -58,6 +58,8 @@ async function runDoctor(): Promise<void> {
       directories,
       bankAppBaseUrl: environment.bankAppBaseUrl,
       openAiConfigured: Boolean(environment.openAiApiKey),
+      staffUsernameConfigured: Boolean(environment.bankStaffUsername),
+      staffPasswordConfigured: Boolean(environment.bankStaffPassword),
       bankCredentialsConfigured: Boolean(
         environment.bankStaffUsername && environment.bankStaffPassword,
       ),

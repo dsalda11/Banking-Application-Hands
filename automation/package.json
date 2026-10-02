@@ -40,7 +40,6 @@
   },
   "dependencies": {
     "commander": "15.0.0",
-    "dotenv": "18.0.0",
     "fastify": "5.12.5",
     "openai": "7.18.0",
     "pino": "10.3.1",

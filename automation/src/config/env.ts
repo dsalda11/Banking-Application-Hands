@@ -1,5 +1,3 @@
-import path from 'node:path';
-import dotenv from 'dotenv';
 import { z } from 'zod';
 
 import { getRepositoryPaths, type RepositoryPaths } from './paths.js';
@@ -78,24 +76,18 @@ export interface AutomationEnvironment {
   readonly paths: RepositoryPaths;
 }
 
-function loadDotEnv(): void {
-  const envPath = path.join(getRepositoryPaths().automationRoot, '.env');
-  dotenv.config({ path: envPath, override: false, quiet: true });
-}
-
 function requiredSecret(
   value: string | undefined,
   name: string,
   required: boolean,
 ): string | undefined {
   if (required && !value) {
-    throw new Error(`${name} is required for this operation`);
+    throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
 }
 
 export function loadEnvironment(options: LoadEnvironmentOptions = {}): AutomationEnvironment {
-  loadDotEnv();
   const parsed = rawEnvironmentSchema.parse(process.env);
   const openAiApiKey = requiredSecret(
     parsed.OPENAI_API_KEY,

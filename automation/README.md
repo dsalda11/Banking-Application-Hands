@@ -15,9 +15,37 @@ npm run doctor
 npm run check
 ```
 
-The checked-in `.env.example` documents optional settings; this phase does not create a real `.env` file. Supply local environment variables externally when a later discovery or replay phase needs them, and never commit credentials.
+Configuration comes from the process environment. No environment template is required or tracked,
+and real environment files are ignored. Supply values from a shell, CI job, or container runtime;
+the application does not depend on how those variables were created.
 
-Real `.env` files are ignored at the repository and automation levels; only `.env.example` templates are tracked. Run `npm run security:scan` from this directory to scan the tracked tree for high-confidence API keys, tokens, private keys, and suspicious secret assignments. The scan intentionally reports paths and categories only, never secret values.
+Required for genuine discovery or banking replay:
+
+```text
+BANK_STAFF_USERNAME
+BANK_STAFF_PASSWORD
+OPENAI_API_KEY       # genuine OpenAI discovery only
+OPENAI_MODEL         # genuine OpenAI discovery only; defaults to gpt-5.6-terra
+```
+
+Optional runtime inputs include `BANK_CUSTOMER_USERNAME`, `BANK_NON_STAFF_USERNAME`, and
+`BANK_NON_STAFF_PASSWORD`. Safe defaults are provided for local, non-secret settings including
+`BANK_APP_BASE_URL=http://127.0.0.1:8080`, `BROWSER_HEADLESS=false`, `OPERATOR_HOST=127.0.0.1`,
+`OPERATOR_PORT=3210`, discovery budgets, and artifact/policy/evidence directories.
+
+Example shell setup (replace placeholders locally; do not commit the command or values):
+
+```bash
+export BANK_STAFF_USERNAME='<staff username>'
+export BANK_STAFF_PASSWORD='<staff password>'
+export OPENAI_API_KEY='<OpenAI key>'       # only for genuine discovery
+export OPENAI_MODEL='gpt-5.6-terra'       # optional
+npm run doctor
+```
+
+`doctor` reports only configuration presence booleans and never prints values. Missing required
+variables are reported by name only. Run `npm run security:scan` to scan tracked files for
+accidental environment files and high-confidence credentials; the scanner never prints values.
 
 Scaffold verification needs no OpenAI API key, banking credentials, running banking app, Docker, browser installation, or network access after dependencies are installed.
 
@@ -179,7 +207,7 @@ npm run discover -- \
 ```
 
 The live command reads only `OPENAI_API_KEY`, `OPENAI_MODEL`, and the declared banking secret
-references from the environment. Discovery JSONL is stored as
+references from the process environment. Discovery JSONL is stored as
 `../evidence/runs/<discovery-run-id>/discovery-events.jsonl`; proposal, policy decision, execution,
 actual result, output candidates, interventions, and stopping conditions are distinct event types.
 Request-human proposals reuse the Step 8 lease/coordinator/operator console and preserve the same
