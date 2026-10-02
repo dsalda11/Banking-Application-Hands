@@ -17,6 +17,8 @@ npm run check
 
 The checked-in `.env.example` documents optional settings; this phase does not create a real `.env` file. Supply local environment variables externally when a later discovery or replay phase needs them, and never commit credentials.
 
+Real `.env` files are ignored at the repository and automation levels; only `.env.example` templates are tracked. Run `npm run security:scan` from this directory to scan the tracked tree for high-confidence API keys, tokens, private keys, and suspicious secret assignments. The scan intentionally reports paths and categories only, never secret values.
+
 Scaffold verification needs no OpenAI API key, banking credentials, running banking app, Docker, browser installation, or network access after dependencies are installed.
 
 The `doctor` command checks the repository directories, write access, runtime version, base URL, optional credential presence, browser mode, and operator address without printing secret values.
