@@ -12,6 +12,11 @@ const trackedFiles = execFileSync('git', ['-C', repositoryRoot, 'ls-files', '-z'
 }).split('\0').filter(Boolean);
 
 const findings = [];
+for (const relativePath of trackedFiles) {
+  if (/(^|\/)\.env(?:$|\.)|(^|\/)[^/]+\.env$/i.test(relativePath)) {
+    findings.push({ category: 'tracked environment file', path: relativePath });
+  }
+}
 const highConfidencePatterns = [
   ['OpenAI API key', /\bsk-[A-Za-z0-9_-]{20,}\b/g],
   ['GitHub token', /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g],

@@ -7,9 +7,12 @@ An intentionally insecure Spring Boot/JSP/MySQL banking demonstration app using 
 Requires Docker Desktop and Compose v2.
 
 ```bash
-cp .env.example .env   # first time only
 docker compose up --build -d
 ```
+
+Compose uses safe local demo defaults for the database and application settings. Override them
+through the shell or CI environment when needed, for example `APP_PORT=8081 docker compose up -d`.
+No environment template is required or tracked.
 
 Open <http://127.0.0.1:8080/index> and log in with:
 
@@ -38,7 +41,9 @@ docker volume rm banking-application-software_banking-mysql-data
 docker compose up --build -d
 ```
 
-For a port conflict, set `APP_PORT=8081` in `.env`. For startup or JSP problems, check `docker compose logs --no-color app`; for database initialization problems, check `docker compose logs --no-color db`. SQL initialization runs only when the database volume is new.
+For a port conflict, set `APP_PORT=8081` in the command environment. For startup or JSP problems,
+check `docker compose logs --no-color app`; for database initialization problems, check
+`docker compose logs --no-color db`. SQL initialization runs only when the database volume is new.
 
 ## Discovery compiler and replay
 
