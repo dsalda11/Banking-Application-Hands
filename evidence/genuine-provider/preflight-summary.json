@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-10-01T20:55:21.843Z",
+  "provider": "openai",
+  "modelConfigured": true,
+  "destinationConfigured": true,
+  "goalId": "banking.discover-customer-account",
+  "policyId": "local-bank-discovery",
+  "observationUrlOrigin": "http://127.0.0.1:8080",
+  "observationBytes": 4315,
+  "modelInputBytes": 6184,
+  "screenshotIncluded": false,
+  "pageContentMarkedUntrusted": true,
+  "secretReferencesOnly": true,
+  "forbiddenFieldMatch": false,
+  "secretValueDetected": false,
+  "origins": [
+    "http://127.0.0.1:8080"
+  ],
+  "preflightPassed": true
+}
