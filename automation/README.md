@@ -44,8 +44,9 @@ npm run doctor
 ```
 
 `doctor` reports only configuration presence booleans and never prints values. Missing required
-variables are reported by name only. Run `npm run security:scan` to scan tracked files for
-accidental environment files and high-confidence credentials; the scanner never prints values.
+variables are reported by name only. Run `npm run security:scan` to scan tracked files and reachable
+Git history for accidental environment files, high-confidence credentials, and hard-coded SMTP
+credentials; the scanner never prints values.
 
 Scaffold verification needs no OpenAI API key, banking credentials, running banking app, Docker, browser installation, or network access after dependencies are installed.
 

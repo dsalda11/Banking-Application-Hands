@@ -30,7 +30,7 @@
     "schema:generate": "tsx src/domain/generate-schemas.ts",
     "schema:check": "tsx src/domain/generate-schemas.ts --check",
     "typecheck": "npx --no-install tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run && node --test ../scripts/secret-scan.test.mjs",
     "test:surface": "vitest run --config vitest.surface.config.ts",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings=0",

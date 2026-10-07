@@ -14,6 +14,10 @@ Compose uses safe local demo defaults for the database and application settings.
 through the shell or CI environment when needed, for example `APP_PORT=8081 docker compose up -d`.
 No environment template is required or tracked.
 
+Email remains disabled by default. If it is deliberately enabled, provide
+`SPRING_MAIL_USERNAME` and `SPRING_MAIL_PASSWORD` through the runtime environment. Never commit
+mail credentials or place them in a repository-local configuration file.
+
 Open <http://127.0.0.1:8080/index> and log in with:
 
 ```text
