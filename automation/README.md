@@ -52,7 +52,8 @@ Scaffold verification needs no OpenAI API key, banking credentials, running bank
 
 The `doctor` command checks the repository directories, write access, runtime version, base URL, optional credential presence, browser mode, and operator address without printing secret values.
 
-Formatting, linting, type checking, tests, and build are available through the scripts in `package.json`. Discovery and replay commands will be documented in later phases.
+Formatting, linting, type checking, tests, and build are available through the scripts in
+`package.json`. The reviewer-facing discovery and replay commands are below.
 
 The Phase 2 domain contracts live under `src/domain/`; the draft example capability is `../artifacts/lookup-customer-account.v1.example.json`. Generate and check reviewable JSON Schemas with:
 
@@ -60,6 +61,81 @@ The Phase 2 domain contracts live under `src/domain/`; the draft example capabil
 npm run schema:generate
 npm run schema:check
 ```
+
+## Running the automation
+
+The following reviewer paths use the repository's existing CLI commands. Run the banking
+application from the repository root and install the automation dependencies and browser once:
+
+```bash
+docker compose up --build -d
+cd automation
+npm install
+npm run browser:install
+```
+
+### Option A — deterministic replay, no LLM credentials required
+
+From `automation/`, supply only the local synthetic banking application's staff credentials and run
+the checked-in capability artifact:
+
+```bash
+export BANK_STAFF_USERNAME="<local-demo-staff-username>"
+export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+BROWSER_HEADLESS=true npm run replay -- \
+  --artifact ../artifacts/lookup-customer-account.v1.example.json \
+  --policy ../policies/local-bank-readonly.v1.json \
+  --input customerUsername=customer
+```
+
+A successful run exits `0` and prints JSON containing:
+
+```json
+{
+  "status": "success",
+  "outputs": {
+    "accountNumber": "2023",
+    "currentBalance": { "amount": "31444", "currency": "USD" }
+  }
+}
+```
+
+Run the existing declared not-found outcome with:
+
+```bash
+BROWSER_HEADLESS=true npm run replay -- \
+  --artifact ../artifacts/lookup-customer-account.v1.example.json \
+  --policy ../policies/local-bank-readonly.v1.json \
+  --input customerUsername=missing-user
+```
+
+It prints `"status":"businessOutcome"` and `"code":"CUSTOMER_NOT_FOUND"`, then exits `2`.
+Deterministic replay interprets the saved artifact and performs no LLM calls, so neither
+`OPENAI_API_KEY` nor `OPENAI_MODEL` is required.
+
+### Option B — new discovery with your own provider credentials
+
+With the banking application still running, provide your own OpenAI credential and model
+configuration at runtime, alongside the local demo banking credentials:
+
+```bash
+export BANK_STAFF_USERNAME="<local-demo-staff-username>"
+export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+export OPENAI_API_KEY="<your-own-key>"
+export OPENAI_MODEL="<supported-model>"
+BROWSER_HEADLESS=true npm run discover -- \
+  --goal ../artifacts/goals/lookup-customer-account.goal.json \
+  --policy ../policies/local-bank-discovery.v1.json \
+  --planner openai \
+  --input customerUsername=customer
+```
+
+Secrets are supplied only through the runtime environment. No `.env` or `.env.example` files are
+tracked, and credentials must never be committed. Deterministic replay does not require model
+credentials. The checked-in sanitized
+[`evidence/genuine-provider/preflight-summary.json`](../evidence/genuine-provider/preflight-summary.json)
+documents the author's genuine provider-backed discovery run without retaining credential values;
+new run evidence is written below the ignored `../evidence/runs/` directory.
 
 ## Surface smoke
 

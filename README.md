@@ -49,6 +49,93 @@ For a port conflict, set `APP_PORT=8081` in the command environment. For startup
 check `docker compose logs --no-color app`; for database initialization problems, check
 `docker compose logs --no-color db`. SQL initialization runs only when the database volume is new.
 
+## Running the automation
+
+Run these commands from the repository root. The automation workspace requires Node.js 24 and npm;
+Docker Desktop with Compose v2 is required for the banking application. Install the automation
+dependencies and its project-local Chromium browser once:
+
+```bash
+cd automation
+npm install
+npm run browser:install
+cd ..
+```
+
+The banking credentials below belong to the local synthetic demo application. Supply them only to
+the process environment; do not put credentials in a repository file.
+
+### Option A — deterministic replay, no LLM credentials required
+
+Start the banking application from the repository root:
+
+```bash
+docker compose up --build -d
+```
+
+Then run the checked-in capability artifact. Replace only the banking credential placeholders with
+the local demo staff credentials:
+
+```bash
+cd automation
+export BANK_STAFF_USERNAME="<local-demo-staff-username>"
+export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+BROWSER_HEADLESS=true npm run replay -- \
+  --artifact ../artifacts/lookup-customer-account.v1.example.json \
+  --policy ../policies/local-bank-readonly.v1.json \
+  --input customerUsername=customer
+```
+
+The command exits `0` and prints a JSON result containing these success fields (run IDs, hashes,
+evidence paths, and timestamps vary):
+
+```json
+{
+  "status": "success",
+  "outputs": {
+    "accountNumber": "2023",
+    "currentBalance": { "amount": "31444", "currency": "USD" }
+  }
+}
+```
+
+The existing not-found demonstration uses the same saved artifact:
+
+```bash
+BROWSER_HEADLESS=true npm run replay -- \
+  --artifact ../artifacts/lookup-customer-account.v1.example.json \
+  --policy ../policies/local-bank-readonly.v1.json \
+  --input customerUsername=missing-user
+```
+
+It prints `"status":"businessOutcome"` and `"code":"CUSTOMER_NOT_FOUND"`, then exits with code
+`2` because that is a declared business outcome. Replay is deterministic and performs no LLM calls;
+it does not require `OPENAI_API_KEY` or `OPENAI_MODEL`.
+
+### Option B — new discovery with your own provider credentials
+
+Leave the banking application running and, from `automation/`, provide the banking credentials plus
+your own OpenAI runtime credential and a model supported by your provider account:
+
+```bash
+export BANK_STAFF_USERNAME="<local-demo-staff-username>"
+export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+export OPENAI_API_KEY="<your-own-key>"
+export OPENAI_MODEL="<supported-model>"
+BROWSER_HEADLESS=true npm run discover -- \
+  --goal ../artifacts/goals/lookup-customer-account.goal.json \
+  --policy ../policies/local-bank-discovery.v1.json \
+  --planner openai \
+  --input customerUsername=customer
+```
+
+All secrets are supplied only at runtime. No `.env` or `.env.example` files are tracked, and
+credentials must never be committed. Deterministic replay remains available without model
+credentials. The checked-in sanitized
+[`evidence/genuine-provider/preflight-summary.json`](evidence/genuine-provider/preflight-summary.json)
+documents the author's genuine provider-backed discovery run without retaining any credential
+value. New run evidence is written below the ignored `evidence/runs/` directory.
+
 ## Discovery compiler and replay
 
 The `automation/` workspace implements bounded discovery, integrity-checked JSONL traces, a
