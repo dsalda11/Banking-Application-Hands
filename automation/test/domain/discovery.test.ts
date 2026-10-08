@@ -10,7 +10,11 @@ import {
 import { ReplayPolicy, type ReplayPolicyType } from '../../src/domain/policy.js';
 import { DiscoveryOrchestrator } from '../../src/discovery/discovery-orchestrator.js';
 import { loadDiscoveryGoal } from '../../src/discovery/goal-loader.js';
-import { PlannerFailure, ScriptedPlannerClient } from '../../src/discovery/planner-client.js';
+import {
+  PlannerFailure,
+  ScriptedPlannerClient,
+  type PlannerRequest,
+} from '../../src/discovery/planner-client.js';
 import { sanitizeObservation } from '../../src/surfaces/web/observation-collector.js';
 import type { SurfaceAdapter } from '../../src/surfaces/surface-types.js';
 
@@ -299,8 +303,10 @@ describe('bounded discovery contracts and orchestration', () => {
 
   it('executes one validated proposal at a time and completes with typed output', async () => {
     const surface = new FakeDiscoverySurface();
-    const planner = new ScriptedPlannerClient((request, call) =>
-      call === 0
+    const requests: PlannerRequest[] = [];
+    const planner = new ScriptedPlannerClient((request, call) => {
+      requests.push(request);
+      return call === 0
         ? proposal(request, 'enterSecret', {
             elementReference: 'field',
             secretName: 'TEST_PASSWORD',
@@ -311,8 +317,8 @@ describe('bounded discovery contracts and orchestration', () => {
               outputName: 'answer',
               transform: 'trim',
             })
-          : proposal(request, 'finish'),
-    );
+          : proposal(request, 'finish');
+    });
     const result = await new DiscoveryOrchestrator().run(options(surface, planner));
     expect(result).toMatchObject({ status: 'success', outputs: { answer: 'verified' } });
     expect(surface.closed).toBe(true);
@@ -325,7 +331,50 @@ describe('bounded discovery contracts and orchestration', () => {
         'run_completed',
       ]),
     );
+    expect(requests[1]?.previousResult).toMatchObject({
+      ok: true,
+      proposalKind: 'enterSecret',
+      secretReference: 'TEST_PASSWORD',
+    });
+    expect(requests[1]?.traceSummary).toContain(
+      'kind=enterSecret:elementReference=field:secretReference=TEST_PASSWORD:ok=true',
+    );
+    expect(JSON.stringify(requests)).not.toContain('confidential-sentinel');
     expect(JSON.stringify(surface.traces)).not.toContain('confidential-sentinel');
+  });
+
+  it('treats newly validated outputs as progress on an unchanged page', async () => {
+    const surface = new FakeDiscoverySurface();
+    surface.staticObservation = true;
+    const twoOutputGoal = goal({
+      outputs: {
+        answer: { description: 'answer', shape: { kind: 'string', minLength: 1 } },
+        secondAnswer: { description: 'second answer', shape: { kind: 'string', minLength: 1 } },
+      },
+      successCriteria: [
+        { kind: 'outputMatchesShape', description: 'answer is typed', output: 'answer' },
+        {
+          kind: 'outputMatchesShape',
+          description: 'second answer is typed',
+          output: 'secondAnswer',
+        },
+      ],
+      budgets: { ...goal().budgets, maxRepeatedStates: 2 },
+    });
+    const planner = new ScriptedPlannerClient((request, call) =>
+      call < 2
+        ? proposal(request, 'extract', {
+            elementReference: 'field',
+            outputName: call === 0 ? 'answer' : 'secondAnswer',
+            transform: 'trim',
+          })
+        : proposal(request, 'finish'),
+    );
+    const result = await new DiscoveryOrchestrator().run(options(surface, planner, twoOutputGoal));
+    expect(result).toMatchObject({
+      status: 'success',
+      outputs: { answer: 'verified', secondAnswer: 'verified' },
+    });
   });
 
   it('fails closed for stale observations and off-origin navigation', async () => {

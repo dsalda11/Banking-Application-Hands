@@ -112,6 +112,8 @@ export function validateArtifactSemantics(
       visitLocatorValue(candidate.name, `${path}.name`, stepId);
     if ('value' in candidate && candidate.value)
       visitLocatorValue(candidate.value, `${path}.value`, stepId);
+    if (candidate.strategy === 'tableCell')
+      visitLocatorValue(candidate.header, `${path}.header`, stepId);
   };
   const visitTarget = (target: TargetDescriptorType, path: string, stepId?: string) => {
     target.candidates.forEach((candidate, index) =>

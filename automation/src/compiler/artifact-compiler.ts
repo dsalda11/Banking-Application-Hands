@@ -10,7 +10,12 @@ import { CapabilityArtifact } from '../domain/artifact.js';
 import { validateArtifactSemantics } from '../domain/semantic-validation.js';
 import type { LoadedDiscoveryGoal } from '../discovery/goal-loader.js';
 import { canonicalJsonFile, contentHash } from './canonical-json.js';
-import { traceAction, traceObservation, type ValidatedTrace } from './trace-loader.js';
+import {
+  traceAction,
+  traceObservation,
+  traceProposal,
+  type ValidatedTrace,
+} from './trace-loader.js';
 
 export const COMPILER_NAME = 'deterministic-trace-artifact-compiler';
 export const COMPILER_VERSION = '1.0.0';
@@ -34,6 +39,11 @@ export interface CompilationManifest {
   readonly goal: { readonly id: string; readonly version: string; readonly hash: string };
   readonly discoveryRunIds: readonly string[];
   readonly traceHashes: readonly string[];
+  readonly providerProvenance: readonly {
+    runId: string;
+    provider: string;
+    model: string;
+  }[];
   readonly policies: readonly {
     id: string;
     version: string;
@@ -91,6 +101,8 @@ interface SuccessfulAction {
   eventSequence: number;
   resultSequence: number;
   resolvedIndex?: number;
+  elementReference?: string;
+  preObservation?: ReturnType<typeof traceObservation>;
   postObservation?: ReturnType<typeof traceObservation>;
   risk?: unknown;
 }
@@ -147,6 +159,17 @@ function actions(trace: ValidatedTrace): SuccessfulAction[] {
           candidate.eventType === 'policy_decision' &&
           candidate.proposalId === event.proposalId,
       );
+    const proposalEvent = event.proposalId
+      ? [...trace.events]
+          .reverse()
+          .find(
+            (candidate) =>
+              candidate.sequence < event.sequence &&
+              candidate.eventType === 'planner_proposal' &&
+              candidate.proposalId === event.proposalId,
+          )
+      : undefined;
+    const proposal = proposalEvent ? traceProposal(proposalEvent) : undefined;
     selected.push({
       action,
       ...(event.proposalId ? { proposalId: event.proposalId } : {}),
@@ -155,6 +178,12 @@ function actions(trace: ValidatedTrace): SuccessfulAction[] {
       ...(typeof result.data.locatorCandidateIndex === 'number'
         ? { resolvedIndex: result.data.locatorCandidateIndex }
         : {}),
+      ...(proposal &&
+      'elementReference' in proposal &&
+      typeof proposal.elementReference === 'string'
+        ? { elementReference: proposal.elementReference }
+        : {}),
+      ...(before ? { preObservation: before } : {}),
       ...(postObservation ? { postObservation } : {}),
       risk: policy?.data.risk,
     });
@@ -168,6 +197,7 @@ function candidateRank(candidate: LocatorCandidateType): number {
     case 'accessibility':
       return 0;
     case 'label':
+    case 'tableCell':
       return 1;
     case 'text':
       return 2;
@@ -189,9 +219,15 @@ function safeCandidate(candidate: LocatorCandidateType): boolean {
 function normalizeTarget(
   target: TargetDescriptorType,
   resolvedIndexes: readonly number[],
+  replacement?: LocatorCandidateType,
 ): TargetDescriptorType {
-  const candidates = [...new Set(resolvedIndexes)]
-    .map((index) => target.candidates[index])
+  const candidates = (
+    replacement
+      ? [replacement]
+      : [
+          ...new Set([...resolvedIndexes, ...target.candidates.map((_candidate, index) => index)]),
+        ].map((index) => target.candidates[index])
+  )
     .filter((candidate): candidate is LocatorCandidateType => Boolean(candidate))
     .filter(safeCandidate)
     .sort((left, right) => candidateRank(left) - candidateRank(right));
@@ -205,6 +241,68 @@ function normalizeTarget(
     ...(target.framePath ? { framePath: target.framePath.filter(safeCandidate) } : {}),
     candidates,
     match: 'exactlyOne',
+  };
+}
+
+function overlapsHorizontally(
+  left: { x: number; width: number },
+  right: { x: number; width: number },
+): boolean {
+  return Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x) > 0;
+}
+
+function structuralExtractorCandidate(item: SuccessfulAction): LocatorCandidateType | undefined {
+  if (item.action.kind !== 'extract') return undefined;
+  const resolved =
+    item.resolvedIndex === undefined
+      ? undefined
+      : item.action.target.candidates[item.resolvedIndex];
+  if (resolved?.strategy !== 'text' || resolved.text.kind !== 'literal') return undefined;
+  const observation = item.preObservation;
+  const outputElement = observation?.elements.find(
+    (element) => element.reference === item.elementReference,
+  );
+  const outputBox = outputElement?.boundingBox;
+  if (!observation || !outputElement || !outputBox)
+    throw new CompilationError(
+      'OUTPUT_LOCATOR_VALUE_DEPENDENT',
+      `Output ${item.action.output} has only a literal-value locator and no structural evidence`,
+    );
+  const possibleHeaders = observation.elements.filter(
+    (element) =>
+      element.frameId === outputElement.frameId &&
+      (element.tagName === 'td' || element.tagName === 'th') &&
+      Boolean(element.text && element.boundingBox) &&
+      element.boundingBox!.y < outputBox.y &&
+      overlapsHorizontally(element.boundingBox!, outputBox),
+  );
+  const header = possibleHeaders.sort(
+    (left, right) => right.boundingBox!.y - left.boundingBox!.y,
+  )[0];
+  if (!header?.text || !header.boundingBox)
+    throw new CompilationError(
+      'OUTPUT_LOCATOR_VALUE_DEPENDENT',
+      `Output ${item.action.output} has no stable associated table header`,
+    );
+  const headerRow = observation.elements
+    .filter(
+      (element) =>
+        element.frameId === header.frameId &&
+        (element.tagName === 'td' || element.tagName === 'th') &&
+        element.boundingBox &&
+        Math.abs(element.boundingBox.y - header.boundingBox!.y) < 0.002,
+    )
+    .sort((left, right) => left.boundingBox!.x - right.boundingBox!.x);
+  const columnIndex = headerRow.findIndex((element) => element.reference === header.reference) + 1;
+  if (columnIndex < 1)
+    throw new CompilationError(
+      'OUTPUT_LOCATOR_VALUE_DEPENDENT',
+      `Output ${item.action.output} table column could not be established`,
+    );
+  return {
+    strategy: 'tableCell',
+    header: { kind: 'literal', value: header.text },
+    columnIndex,
   };
 }
 
@@ -243,17 +341,31 @@ function checkpointFor(action: CapabilityActionType, postUrl?: string): Checkpoi
 }
 
 function normalizedAction(
-  action: CapabilityActionType,
-  primaryIndex: number | undefined,
+  item: SuccessfulAction,
   fallbackIndexes: readonly number[],
 ): CapabilityActionType {
+  const action = item.action;
   if (!('target' in action) || !action.target) return action;
-  if (primaryIndex === undefined)
+  if (item.resolvedIndex === undefined)
     throw new CompilationError(
       'LOCATOR_PROVENANCE_MISSING',
       'Target action lacks resolved locator provenance',
     );
-  return { ...action, target: normalizeTarget(action.target, [primaryIndex, ...fallbackIndexes]) };
+  const structural = structuralExtractorCandidate(item);
+  const target = normalizeTarget(
+    action.target,
+    [item.resolvedIndex, ...fallbackIndexes],
+    structural,
+  );
+  return {
+    ...action,
+    target:
+      structural?.strategy === 'tableCell' &&
+      structural.header.kind === 'literal' &&
+      action.kind === 'extract'
+        ? { ...target, description: `${action.output} table cell under ${structural.header.value}` }
+        : target,
+  };
 }
 
 function observedAuthenticatedTransition(selected: readonly SuccessfulAction[]): boolean {
@@ -380,7 +492,7 @@ export class ArtifactCompiler {
         .map((trace) => actions(trace)[index])
         .filter((other) => other?.action.kind === item.action.kind)
         .flatMap((other) => (other?.resolvedIndex === undefined ? [] : [other.resolvedIndex]));
-      const action = normalizedAction(item.action, item.resolvedIndex, fallbackIndexes);
+      const action = normalizedAction(item, fallbackIndexes);
       const id = `step-${String(index + 1).padStart(3, '0')}-${action.kind.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
       const postUrl = item.postObservation?.url;
       const checkpoint = checkpointFor(action, postUrl);
@@ -445,10 +557,27 @@ export class ArtifactCompiler {
         entryPoint: { kind: 'absoluteUrl', url: loadedGoal.goal.startUrl },
         fingerprints: [
           {
-            kind: 'titlePattern',
-            id: 'observed-start-title',
-            pattern: `^${escapePattern(firstObservation.title)}$`,
+            kind: 'urlPathPattern',
+            id: 'observed-start-route',
+            pattern: `^${escapePattern(new URL(firstObservation.url).pathname)}$`,
           },
+          ...firstObservation.headings
+            .filter((heading) => !heading.includes('[REDACTED]'))
+            .slice(0, 2)
+            .map((heading, index) => ({
+              kind: 'requiredText' as const,
+              id: `observed-start-heading-${index + 1}`,
+              text: heading,
+            })),
+          ...(firstObservation.title === '(untitled)'
+            ? []
+            : [
+                {
+                  kind: 'titlePattern' as const,
+                  id: 'observed-start-title',
+                  pattern: `^${escapePattern(firstObservation.title)}$`,
+                },
+              ]),
         ],
       },
       contract: {
@@ -512,6 +641,32 @@ export class ArtifactCompiler {
     const warnings = semantic.issues
       .filter((issue) => issue.severity === 'warning')
       .map((issue) => issue.message);
+    const providerProvenance = [
+      ...new Map(
+        traces.flatMap((trace) =>
+          trace.events.flatMap((event) =>
+            event.eventType === 'planner_proposal' &&
+            typeof event.data.provider === 'string' &&
+            typeof event.data.model === 'string'
+              ? [
+                  [
+                    `${trace.runId}|${event.data.provider}|${event.data.model}`,
+                    {
+                      runId: trace.runId,
+                      provider: event.data.provider,
+                      model: event.data.model,
+                    },
+                  ] as const,
+                ]
+              : [],
+          ),
+        ),
+      ).values(),
+    ].sort((left, right) =>
+      `${left.runId}|${left.provider}|${left.model}`.localeCompare(
+        `${right.runId}|${right.provider}|${right.model}`,
+      ),
+    );
     const manifest: CompilationManifest = {
       schemaVersion: '1.0.0',
       compiler: { name: COMPILER_NAME, version: COMPILER_VERSION },
@@ -523,6 +678,7 @@ export class ArtifactCompiler {
       },
       discoveryRunIds: traces.map((trace) => trace.runId).sort(),
       traceHashes: traces.map((trace) => trace.traceHash).sort(),
+      providerProvenance,
       policies: [
         {
           id: primary.policyId,
@@ -553,7 +709,9 @@ export class ArtifactCompiler {
                   (candidate) => candidate.strategy,
                 ),
                 reason:
-                  'Candidates resolved exactly once in successful traces and were ranked semantically.',
+                  step.action.kind === 'extract'
+                    ? 'Literal output-value locators were replaced by observed table-header and column structure.'
+                    : 'The resolved locator and independent stable candidates issued by the same observation were ranked semantically.',
               },
             ]
           : [],

@@ -533,6 +533,16 @@
         {
           "type": "object",
           "properties": {
+            "strategy": { "type": "string", "const": "tableCell" },
+            "header": { "$ref": "#/$defs/__schema9" },
+            "columnIndex": { "type": "integer", "minimum": 1, "maximum": 128 }
+          },
+          "required": ["strategy", "header", "columnIndex"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
             "strategy": { "$ref": "#/$defs/__schema11" },
             "role": { "$ref": "#/$defs/__schema12" },
             "name": { "$ref": "#/$defs/__schema13" }

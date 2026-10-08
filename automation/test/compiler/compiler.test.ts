@@ -7,6 +7,8 @@ import type { LoadedDiscoveryGoal } from '../../src/discovery/goal-loader.js';
 import { contentHash } from '../../src/compiler/canonical-json.js';
 import { DiscoveryTraceLoader } from '../../src/compiler/trace-loader.js';
 import { ArtifactCompiler } from '../../src/compiler/artifact-compiler.js';
+import { CapabilityArtifact } from '../../src/domain/artifact.js';
+import { loadDiscoveryGoal } from '../../src/discovery/goal-loader.js';
 import {
   promoteArtifact,
   reviewArtifact,
@@ -170,7 +172,11 @@ function makeTrace(runId = 'run-success', terminal: 'success' | 'outcome' = 'suc
     );
   };
   const proposalAction = (id: string, proposal: Record<string, unknown>, value: unknown) => {
-    add('planner_proposal', { proposalJson: JSON.stringify(proposal) }, id);
+    add(
+      'planner_proposal',
+      { proposalJson: JSON.stringify(proposal), provider: 'openai', model: 'gpt-test' },
+      id,
+    );
     add('proposal_validated', { valid: true, kind: proposal.kind }, id);
     add(
       'policy_decision',
@@ -276,7 +282,11 @@ function makeTrace(runId = 'run-success', terminal: 'success' | 'outcome' = 'suc
       observationJson: JSON.stringify(observation('obs-finish', 'http://127.0.0.1:8080/details')),
     });
     const finish = { ...base('p-finish', 'finish'), observationId: 'obs-finish' };
-    add('planner_proposal', { proposalJson: JSON.stringify(finish) }, 'p-finish');
+    add(
+      'planner_proposal',
+      { proposalJson: JSON.stringify(finish), provider: 'openai', model: 'gpt-test' },
+      'p-finish',
+    );
     add('proposal_validated', { valid: true, kind: 'finish' }, 'p-finish');
     add('policy_decision', { decision: 'allow' }, 'p-finish');
     add(
@@ -502,14 +512,90 @@ describe('DiscoveryTraceLoader and deterministic ArtifactCompiler', () => {
     expect(
       targeted.every(
         (step) =>
-          (step.action as { target: { candidates: unknown[] } }).target.candidates.length === 1,
+          (step.action as { target: { candidates: unknown[] } }).target.candidates.length === 2,
       ),
     ).toBe(true);
+    expect(first.artifact.target.fingerprints).toEqual(
+      expect.arrayContaining([
+        { kind: 'urlPathPattern', id: 'observed-start-route', pattern: '^/start$' },
+        { kind: 'requiredText', id: 'observed-start-heading-1', text: 'Fixture' },
+      ]),
+    );
     expect(first.artifact.steps.map((step) => step.id)).toEqual(
       first.artifact.steps.map((step) => step.id).sort(),
     );
     expect(first.artifact.steps[0]!.recovery.kind).toBe('none');
     expect(first.artifact.success.kind).toBe('all');
+    expect(first.manifest.providerProvenance).toEqual([
+      { runId: 'run-success', provider: 'openai', model: 'gpt-test' },
+    ]);
+  });
+
+  it('replaces genuine observed output values with deterministic semantic table-cell locators', async () => {
+    const repository = path.resolve(process.cwd(), '..');
+    const genuineGoal = await loadDiscoveryGoal(
+      path.join(repository, 'artifacts/goals/lookup-customer-account.goal.json'),
+    );
+    const traceFiles = [
+      'discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b',
+      'discovery-ef14b0a1-b648-4e60-8015-f789c102006e',
+    ].map((runId) => path.join(repository, 'evidence/runs', runId, 'discovery-events.jsonl'));
+    const genuineTraces = await new DiscoveryTraceLoader().loadSet(traceFiles);
+    const compile = () =>
+      new ArtifactCompiler().compile(
+        genuineGoal,
+        genuineTraces,
+        {
+          id: 'banking.lookup-customer-account.genuine-compiled',
+          version: '9.9.9',
+        },
+        { compilationTime: '2026-10-07T00:00:00.000Z' },
+      );
+    const first = compile();
+    const second = compile();
+    const extractors = Object.fromEntries(
+      first.artifact.steps.flatMap((step) =>
+        step.action.kind === 'extract' ? [[step.action.output, step.action.target] as const] : [],
+      ),
+    );
+
+    expect(extractors).toMatchObject({
+      accountNumber: {
+        candidates: [
+          {
+            strategy: 'tableCell',
+            header: { kind: 'literal', value: 'Account No.' },
+            columnIndex: 3,
+          },
+        ],
+      },
+      currentBalance: {
+        candidates: [
+          {
+            strategy: 'tableCell',
+            header: { kind: 'literal', value: 'Balance' },
+            columnIndex: 4,
+          },
+        ],
+      },
+    });
+    expect(JSON.stringify(extractors)).not.toContain('2023');
+    expect(JSON.stringify(extractors)).not.toContain('31444');
+    expect(first.artifact.target.fingerprints).toEqual(
+      expect.arrayContaining([
+        { kind: 'urlPathPattern', id: 'observed-start-route', pattern: '^/index$' },
+        { kind: 'requiredText', id: 'observed-start-heading-1', text: '- Welcome Guest -' },
+        { kind: 'requiredText', id: 'observed-start-heading-2', text: 'Login :-' },
+      ]),
+    );
+    expect(first.artifact.target.fingerprints).not.toContainEqual({
+      kind: 'titlePattern',
+      id: 'observed-start-title',
+      pattern: '^\\(untitled\\)$',
+    });
+    expect(CapabilityArtifact.safeParse(first.artifact).success).toBe(true);
+    expect(first.artifactBytes).toBe(second.artifactBytes);
+    expect(first.artifactHash).toBe(second.artifactHash);
   });
 
   it('records failed exploration as discarded instead of executable', async () => {

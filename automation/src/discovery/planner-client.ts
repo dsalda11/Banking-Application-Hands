@@ -6,7 +6,14 @@ import type {
 import { DiscoveryProposal } from '../domain/discovery.js';
 
 export type PlannerFailureCode =
-  'AUTHENTICATION' | 'RATE_LIMIT' | 'TIMEOUT' | 'REFUSAL' | 'MALFORMED_OUTPUT' | 'PROVIDER_ERROR';
+  | 'AUTHENTICATION'
+  | 'AUTHORIZATION'
+  | 'INVALID_REQUEST'
+  | 'RATE_LIMIT'
+  | 'TIMEOUT'
+  | 'REFUSAL'
+  | 'MALFORMED_OUTPUT'
+  | 'PROVIDER_ERROR';
 
 export class PlannerFailure extends Error {
   constructor(

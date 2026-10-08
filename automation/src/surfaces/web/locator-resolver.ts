@@ -23,6 +23,15 @@ function bind(source: LocatorValueSourceType, context: ExecutionContext): string
   return value;
 }
 
+function xpathLiteral(value: string): string {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  return `concat(${value
+    .split("'")
+    .map((part) => `'${part}'`)
+    .join(', "\'", ')})`;
+}
+
 function locate(
   root: LocatorRoot,
   candidate: LocatorCandidateType,
@@ -58,6 +67,13 @@ function locate(
       return root.locator(candidate.selector);
     case 'xpath':
       return root.locator(`xpath=${candidate.expression}`);
+    case 'tableCell': {
+      const header = xpathLiteral(bind(candidate.header, context));
+      const column = candidate.columnIndex;
+      return root.locator(
+        `xpath=//table[.//tr[1]/*[${column}][normalize-space(.)=${header}]]//tr[position() > 1]/*[${column}]`,
+      );
+    }
     case 'accessibility':
       return candidate.role
         ? root.getByRole(

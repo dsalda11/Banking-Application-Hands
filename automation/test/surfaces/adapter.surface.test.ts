@@ -109,6 +109,76 @@ describe('Playwright surface fixture', () => {
     );
     expect(result.ok).toBe(true);
   });
+  it('observes input submit and reset controls as distinct named buttons', async () => {
+    await adapter.session.page!.setContent(
+      '<form><input type="submit" value="Submit"><input type="reset" value="Clear"></form>',
+    );
+    const observation = await adapter.observe();
+    const submit = observation.elements.find((element) => element.name === 'Submit');
+    const reset = observation.elements.find((element) => element.name === 'Clear');
+    expect(submit).toMatchObject({ role: 'button', inputType: 'submit', editable: false });
+    expect(reset).toMatchObject({ role: 'button', inputType: 'reset', editable: false });
+    expect(submit?.locatorCandidates[0]).toMatchObject({
+      strategy: 'role',
+      role: 'button',
+      name: { kind: 'literal', value: 'Submit' },
+    });
+  });
+  it('extracts changed table values by semantic header without recompiling the target', async () => {
+    await adapter.session.page!.setContent(
+      '<table><tr><td>Name</td><td>Email</td><td>Account No.</td><td>Balance</td></tr><tr><td>other</td><td>other</td><td>9001</td><td>77777</td></tr></table>',
+    );
+    const accountTarget = TargetDescriptor.parse({
+      description: 'account number by column meaning',
+      candidates: [
+        {
+          strategy: 'tableCell',
+          header: { kind: 'literal', value: 'Account No.' },
+          columnIndex: 3,
+        },
+      ],
+      match: 'exactlyOne',
+    });
+    const balanceTarget = TargetDescriptor.parse({
+      description: 'balance by column meaning',
+      candidates: [
+        {
+          strategy: 'tableCell',
+          header: { kind: 'literal', value: 'Balance' },
+          columnIndex: 4,
+        },
+      ],
+      match: 'exactlyOne',
+    });
+
+    expect(
+      (
+        await adapter.execute(
+          {
+            kind: 'extract',
+            output: 'accountNumber',
+            target: accountTarget,
+            transform: { kind: 'trim' },
+          },
+          context,
+        )
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await adapter.execute(
+          {
+            kind: 'extract',
+            output: 'currentBalance',
+            target: balanceTarget,
+            transform: { kind: 'trim' },
+          },
+          context,
+        )
+      ).ok,
+    ).toBe(true);
+    expect(context.outputs).toMatchObject({ accountNumber: '9001', currentBalance: '77777' });
+  });
   it('evaluates checkpoints and rejects external navigation', async () => {
     await adapter.session.page!.setContent('<h1>Bank</h1><input aria-label="Name">');
     expect(

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CapabilityAction, type CapabilityActionType } from '../../src/domain/index.js';
 import { loadArtifact } from '../../src/replay/artifact-loader.js';
 import { ArtifactRegistry, ArtifactRegistryError } from '../../src/replay/artifact-registry.js';
@@ -214,24 +214,42 @@ function fakeAdapter(): SurfaceAdapter & { actions: string[] } {
 }
 
 describe('generic replay', () => {
-  it('does not run banking-specific workflow code and returns declared outcomes', async () => {
+  it('executes only the artifact and adapter with zero network or model calls', async () => {
     const loaded = await loadArtifact(examplePath);
     const loadedPolicy = await loadPolicy(
       path.resolve(process.cwd(), '../policies/local-bank-readonly.v1.json'),
     );
     const adapter = fakeAdapter();
-    const result = await new ReplayEngine().run({
-      loadedArtifact: loaded,
-      inputs: { customerUsername: 'customer' },
-      secrets: { BANK_STAFF_USERNAME: 'admin', BANK_STAFF_PASSWORD: 'admin' },
-      baseUrl: 'http://bank.test',
-      evidenceDirectory: '/tmp/evidence',
-      headless: true,
-      adapter,
-      loadedPolicy,
-    });
-    expect(result.status).toBe('businessOutcome');
-    expect(adapter.actions.length).toBeGreaterThan(0);
-    expect(adapter.actions).not.toContain('login');
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network forbidden'));
+    try {
+      const result = await new ReplayEngine().run({
+        loadedArtifact: loaded,
+        inputs: { customerUsername: 'customer' },
+        secrets: { BANK_STAFF_USERNAME: 'admin', BANK_STAFF_PASSWORD: 'admin' },
+        baseUrl: 'http://bank.test',
+        evidenceDirectory: '/tmp/evidence',
+        headless: true,
+        adapter,
+        loadedPolicy,
+      });
+      expect(result.status).toBe('businessOutcome');
+      expect(adapter.actions.length).toBeGreaterThan(0);
+      expect(adapter.actions).not.toContain('login');
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+
+  it('keeps deterministic replay and lifecycle code free of discovery/provider dependencies', async () => {
+    for (const relativePath of [
+      '../../src/replay/replay-engine.ts',
+      '../../src/compiler/artifact-lifecycle.ts',
+    ]) {
+      const source = await readFile(new URL(relativePath, import.meta.url), 'utf8');
+      expect(source).not.toMatch(
+        /PlannerClient|OpenAIResponsesPlanner|DiscoveryOrchestrator|openai-planner/,
+      );
+    }
   });
 });

@@ -31,6 +31,11 @@ export const LocatorCandidate = z.discriminatedUnion('strategy', [
   }),
   z.strictObject({ strategy: z.literal('css'), selector: NonEmptyString.max(512) }),
   z.strictObject({ strategy: z.literal('xpath'), expression: NonEmptyString.max(512) }),
+  z.strictObject({
+    strategy: z.literal('tableCell'),
+    header: LocatorValueSource,
+    columnIndex: z.number().int().min(1).max(128),
+  }),
   z
     .strictObject({
       strategy: z.literal('accessibility'),

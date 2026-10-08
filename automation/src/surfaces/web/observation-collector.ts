@@ -122,19 +122,26 @@ export async function collectObservation(
       if (!(await item.isVisible().catch(() => false))) continue;
       const data = await item.evaluate((element) => {
         const tagName = element.tagName.toLowerCase();
+        const inputType =
+          element instanceof HTMLInputElement ? element.type.toLowerCase() : undefined;
+        const inputButton =
+          tagName === 'input' &&
+          inputType !== undefined &&
+          ['button', 'image', 'reset', 'submit'].includes(inputType);
         const explicitRole = element.getAttribute('role');
         const role =
           explicitRole ??
           (tagName === 'a'
             ? 'link'
-            : tagName === 'button'
+            : tagName === 'button' || inputButton
               ? 'button'
               : tagName === 'input'
                 ? 'textbox'
                 : undefined);
         const label =
           element.getAttribute('aria-label') ??
-          (element instanceof HTMLInputElement ? element.labels?.[0]?.textContent : undefined);
+          (element instanceof HTMLInputElement ? element.labels?.[0]?.textContent : undefined) ??
+          (inputButton && element instanceof HTMLInputElement ? element.value : undefined);
         const text = label ?? element.textContent ?? undefined;
         return {
           tagName,
@@ -143,10 +150,10 @@ export async function collectObservation(
           name: label ?? element.getAttribute('name') ?? undefined,
           attributeName: element.getAttribute('name') ? 'name' : undefined,
           attributeValue: element.getAttribute('name') ?? undefined,
-          inputType: element.getAttribute('type') ?? undefined,
+          inputType,
           enabled: !(element as HTMLButtonElement).disabled,
           editable:
-            tagName === 'input' ||
+            (tagName === 'input' && !inputButton) ||
             tagName === 'textarea' ||
             element.getAttribute('contenteditable') === 'true',
         };

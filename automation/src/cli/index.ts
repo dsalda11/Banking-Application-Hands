@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 
 import { loadEnvironment } from '../config/env.js';
+import { isDoctorReady } from '../config/doctor.js';
 import { runBankingSurfaceSmoke } from '../smoke/banking-surface-smoke.js';
 import { loadArtifact } from '../replay/artifact-loader.js';
 import { ArtifactRegistry } from '../replay/artifact-registry.js';
@@ -67,7 +68,7 @@ async function runDoctor(): Promise<void> {
       operator: `${environment.operatorHost}:${environment.operatorPort}`,
     };
     console.log(JSON.stringify(report, null, 2));
-    if (!Object.values(directories).every(Boolean)) {
+    if (!isDoctorReady(report)) {
       process.exitCode = 1;
     }
   } catch (error: unknown) {
@@ -481,6 +482,11 @@ async function runDiscovery(options: {
         ? ('sanitized' as const)
         : ('disabled' as const),
   };
+  const secrets = Object.fromEntries(
+    runtimeGoal.secretReferences
+      .map((name) => [name, process.env[name]] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+  );
   const planner =
     options.planner === 'openai'
       ? new OpenAIResponsesPlanner({
@@ -488,13 +494,9 @@ async function runDiscovery(options: {
           model: environment.openAiModel,
           timeoutMs: Math.min(30_000, runtimeGoal.budgets.timeoutMs),
           maxRetries: 1,
+          forbiddenOutboundValues: Object.values(secrets),
         })
       : createBankingScriptedPlanner();
-  const secrets = Object.fromEntries(
-    runtimeGoal.secretReferences
-      .map((name) => [name, process.env[name]] as const)
-      .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
-  );
   const result = await new DiscoveryOrchestrator().run({
     loadedGoal: { ...loaded, goal: runtimeGoal },
     loadedPolicy,

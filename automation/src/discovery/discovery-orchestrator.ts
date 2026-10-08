@@ -139,6 +139,7 @@ export class DiscoveryOrchestrator {
     const stateCounts = new Map<string, number>();
     const fingerprintHistory: string[] = [];
     const pairHistory: string[] = [];
+    const completedActionSummaries: string[] = [];
     let humanApprovedActionSignature: string | undefined;
     const lease = new ControlLeaseManager(runId, interventionId, 'Bounded discovery');
     const guard = new AutomationActionGuard(lease, options.cancellationSignal);
@@ -263,8 +264,9 @@ export class DiscoveryOrchestrator {
         record('observation', {
           observationJson: JSON.stringify(currentObservation),
         });
-        const count = (stateCounts.get(currentObservation.stateFingerprint) ?? 0) + 1;
-        stateCounts.set(currentObservation.stateFingerprint, count);
+        const progressState = `${currentObservation.stateFingerprint}:${Object.keys(outputs).sort().join(',')}`;
+        const count = (stateCounts.get(progressState) ?? 0) + 1;
+        stateCounts.set(progressState, count);
         fingerprintHistory.push(currentObservation.stateFingerprint);
         if (count > goal.budgets.maxRepeatedStates)
           throw new DiscoveryStop('REPEATED_STATE', 'Repeated state limit reached');
@@ -290,9 +292,7 @@ export class DiscoveryOrchestrator {
               observation: currentObservation,
               ...(previousResult ? { previousResult } : {}),
               remaining: remaining(),
-              traceSummary: trace
-                .slice(-8)
-                .map((event) => `${event.eventType}:${event.proposalId ?? '-'}`),
+              traceSummary: completedActionSummaries.slice(-12),
             },
             options.cancellationSignal,
           );
@@ -613,7 +613,32 @@ export class DiscoveryOrchestrator {
         );
         if (result.output)
           record('output_candidate', { outputName: result.output.name, valid: true }, proposal);
-        previousResult = { ok: result.ok, action: result.action, errorCode: result.error?.code };
+        completedActionSummaries.push(
+          [
+            `kind=${proposal.kind}`,
+            'elementReference' in proposal
+              ? `elementReference=${proposal.elementReference ?? '-'}`
+              : undefined,
+            proposal.kind === 'enterSecret' ? `secretReference=${proposal.secretName}` : undefined,
+            proposal.kind === 'enterInput' ? `inputReference=${proposal.inputName}` : undefined,
+            proposal.kind === 'extract' ? `outputReference=${proposal.outputName}` : undefined,
+            `ok=${String(result.ok)}`,
+          ]
+            .filter(Boolean)
+            .join(':'),
+        );
+        previousResult = {
+          ok: result.ok,
+          action: result.action,
+          proposalKind: proposal.kind,
+          ...('elementReference' in proposal
+            ? { elementReference: proposal.elementReference ?? null }
+            : {}),
+          ...(proposal.kind === 'enterSecret' ? { secretReference: proposal.secretName } : {}),
+          ...(proposal.kind === 'enterInput' ? { inputReference: proposal.inputName } : {}),
+          ...(proposal.kind === 'extract' ? { outputReference: proposal.outputName } : {}),
+          errorCode: result.error?.code,
+        };
         failures = result.ok ? 0 : failures + 1;
       }
     } catch (error: unknown) {
