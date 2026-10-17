@@ -1,0 +1,190 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "step11Verification",
+  "completedAt": "2026-10-08T04:22:45Z",
+  "capability": {
+    "id": "banking.lookup-customer-account.genuine-compiled",
+    "version": "1.0.2",
+    "artifactPath": "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json",
+    "canonicalArtifactHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095",
+    "artifactMutatedAfterApproval": false
+  },
+  "approval": {
+    "decision": "approved",
+    "reviewer": "Darryl via explicit Step 11 approval",
+    "reviewedAt": "2026-10-08T04:20:30.787Z",
+    "recordPath": "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.review.json",
+    "recordSha256": "bc95f1776d51d2983527d215a229286d3bfa1dae8dc77010207e7fe284974a64",
+    "canonicalReviewHash": "c92a1546acad3b7b50d73edf152b0707f90076e0fc1d865e592694da306fd2f3",
+    "artifactHashVerifiedBeforeReplay": true
+  },
+  "discoveryProvenance": {
+    "goal": {
+      "id": "banking.discover-customer-account",
+      "version": "1.0.0",
+      "path": "artifacts/goals/lookup-customer-account.goal.json",
+      "hash": "d989c223f028a791c7ecdd7660127fa1b28beece3e6efd2378161801d54d4494"
+    },
+    "successfulRun": {
+      "runId": "discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b",
+      "tracePath": "evidence/runs/discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b/discovery-events.jsonl",
+      "traceHash": "f92e3570a152091678c9f5c95fef593e5edb736266e176fe544e82908a972205",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "productionTraceValidation": "passed"
+    },
+    "missingCustomerRun": {
+      "runId": "discovery-ef14b0a1-b648-4e60-8015-f789c102006e",
+      "tracePath": "evidence/runs/discovery-ef14b0a1-b648-4e60-8015-f789c102006e/discovery-events.jsonl",
+      "traceHash": "44a7304d8ec8fc8b8e19a5cf1e785f596556ad9344cd39061ae329a6bb4af3c4",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "result": "CUSTOMER_NOT_FOUND",
+      "productionTraceValidation": "passed"
+    },
+    "compilationManifestPath": "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.compilation.json"
+  },
+  "deterministicReplay": {
+    "modelCalls": 0,
+    "providerCredentialsUnsetDuringReplay": true,
+    "plannerClientInvoked": false,
+    "discoveryOrchestratorInvoked": false,
+    "providerFallbackAvailable": false,
+    "freshSessions": 2,
+    "policy": {
+      "id": "local-bank-discovery",
+      "version": "1.0.0",
+      "hash": "277c28ecb4ede2121748a67902e8f5ab4183552ad53bbf4c404b682325baac23",
+      "preflight": "passed"
+    },
+    "successfulReplay": {
+      "runId": "replay-82901137-8bfa-4b05-8572-d98e017b4536",
+      "result": "success",
+      "artifactHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095",
+      "policyAllowDecisions": 9,
+      "passedCheckpoints": 10,
+      "dynamicExtractorStrategy": "tableCell",
+      "typedOutputs": {
+        "accountNumber": "2023",
+        "currentBalance": {
+          "amount": "31444",
+          "currency": "USD"
+        }
+      },
+      "outputShape": {
+        "accountNumber": "non-empty string",
+        "currentBalance": {
+          "amount": "non-empty string",
+          "currency": "USD"
+        }
+      },
+      "evidence": [
+        {
+          "path": "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/result.json",
+          "sha256": "b57747c6a29260bac2f37e5b04d8900b09733b76319f9a3986bd71b0eb269ef2",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/observation.json",
+          "sha256": "32630fed2b6b760fe39548ae52f06b970244ae6fbd3da73408cff0db33638aa9",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/events.jsonl",
+          "sha256": "a6b3edba95cebfac65133c0e4e6c749c2125123224997ff3ee03d009fbcb519d",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/replay-final.png",
+          "sha256": "1aa131e58bebb1bce7a960d8c291518bb77b7db41cb729931173bb35634316c5",
+          "sanitization": "sanitized"
+        }
+      ]
+    },
+    "missingCustomerReplay": {
+      "runId": "replay-96576566-7d42-494f-8223-10486f78884b",
+      "result": "CUSTOMER_NOT_FOUND",
+      "classification": "businessOutcome",
+      "artifactHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095",
+      "policyAllowDecisions": 7,
+      "passedCheckpoints": 7,
+      "businessOutcomeDetected": true,
+      "evidence": [
+        {
+          "path": "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/result.json",
+          "sha256": "3f99ed72eee3046bb20aa44dc66775867c80b2520e5c30f141b55b5f54b859da",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/observation.json",
+          "sha256": "dfd72e64c50e620fd435c99202174526e6016f33d6036cc22e1b59c28a74fc2c",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/events.jsonl",
+          "sha256": "6a5df4c1e8a824b03458e79aaf92cffc991b6006d949d4f79613f4ca91f084cf",
+          "sanitization": "sanitized"
+        },
+        {
+          "path": "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/replay-business-outcome.png",
+          "sha256": "1391e282c41a1a6d0b655daec210a18ca551d07cbbb8edc28f4ecf176b7f8c98",
+          "sanitization": "sanitized"
+        }
+      ]
+    }
+  },
+  "verification": {
+    "lifecycleManifestPath": "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.verification.json",
+    "lifecycleManifestSha256": "8ec50631381f1f432c099a4f66ab2088df85968cbe2335aaaa59699d4f64a16c",
+    "focusedReplayAndLifecycleTests": {
+      "status": "passed",
+      "testFiles": 2,
+      "tests": 22
+    },
+    "unitSuite": {
+      "status": "passed",
+      "testFiles": 19,
+      "tests": 91,
+      "secretScanTests": 2
+    },
+    "surfaceSuite": {
+      "status": "passed",
+      "testFiles": 5,
+      "tests": 29
+    },
+    "format": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "schemaCheck": "passed",
+    "build": "passed",
+    "doctor": "passed",
+    "securityScan": "passed",
+    "gitDiffCheck": "passed"
+  },
+  "confidentiality": {
+    "status": "passed",
+    "providerApiKeysRetained": false,
+    "bankingPasswordsRetained": false,
+    "cookiesRetained": false,
+    "storageStateRetained": false,
+    "authorizationHeadersRetained": false,
+    "operatorTokensRetained": false,
+    "rawProviderPayloadsRetained": false,
+    "rawPlaywrightTraceArchivesRetained": false
+  },
+  "verticalSlice": [
+    "natural-language goal",
+    "genuine OpenAI discovery",
+    "validated sanitized discovery traces",
+    "deterministic compilation",
+    "exact-hash human approval",
+    "fresh model-free successful replay",
+    "typed output validation",
+    "fresh model-free business-outcome replay"
+  ],
+  "promotion": {
+    "eligibility": "promotionEligible",
+    "activeRegistryPromotionPerformed": false,
+    "separatePromotionDecisionRequired": true
+  }
+}
