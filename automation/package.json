@@ -10,6 +10,8 @@
     "dev": "tsx src/cli/index.ts",
     "doctor": "tsx src/cli/index.ts doctor",
     "security:scan": "node ../scripts/secret-scan.mjs",
+    "security:dependencies": "npm audit --audit-level=high",
+    "evidence:check": "node ../scripts/evidence-check.mjs",
     "surface:smoke": "tsx src/cli/index.ts surface-smoke",
     "proof:bank": "tsx src/cli/index.ts proof-bank",
     "artifact:list": "tsx src/cli/index.ts artifact:list",

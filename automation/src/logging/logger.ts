@@ -16,12 +16,22 @@ const redactedPaths = [
   '*.token',
   '*.accessToken',
   '*.refreshToken',
+  '*.operatorToken',
+  '*.storageState',
+  '*.rawProviderRequest',
+  '*.rawProviderResponse',
+  '*.providerPayload',
   'password',
   'apiKey',
   'authorization',
   'cookie',
   'cookies',
   'token',
+  'operatorToken',
+  'storageState',
+  'rawProviderRequest',
+  'rawProviderResponse',
+  'providerPayload',
 ];
 
 export function createLogger(options: LoggerOptions = {}): Logger {

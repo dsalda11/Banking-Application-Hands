@@ -37,6 +37,8 @@ const safeValues = new Set([
 ]);
 const environmentLike =
   /(^|\/)(\.env(?:\.[^/]+)?|[^/]+\.(?:properties|ya?ml|json|toml))$/i;
+const retainedEvidenceField =
+  /"(?:bankingPassword|cookies?|storageState|operatorToken|apiPayload|providerPayload|rawProviderRequest|rawProviderResponse)"\s*:/gi;
 
 function normalizedValue(rawValue) {
   return rawValue.trim().replace(/^['"]|['"]$/g, "");
@@ -84,6 +86,16 @@ export function scanContent(relativePath, content) {
       });
     }
   }
+
+  if (
+    /^(?:evidence|artifacts)\//.test(relativePath) &&
+    retainedEvidenceField.test(content)
+  )
+    findings.push({
+      category: "forbidden sensitive field in retained evidence",
+      path: relativePath,
+    });
+  retainedEvidenceField.lastIndex = 0;
 
   return findings;
 }

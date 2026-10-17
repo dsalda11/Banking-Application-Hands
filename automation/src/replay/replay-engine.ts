@@ -5,6 +5,7 @@ import type { Logger } from 'pino';
 import type { CapabilityArtifactType, CapabilityStepType, RunResultType } from '../domain/index.js';
 import { ErrorDetail } from '../domain/errors.js';
 import type { DataShapeType } from '../domain/data-shapes.js';
+import { Checkpoint } from '../domain/checkpoints.js';
 import type { EvidenceReferenceType } from '../domain/evidence.js';
 import type { ExecutionContext } from '../execution/execution-context.js';
 import { SurfaceError } from '../surfaces/surface-errors.js';
@@ -61,7 +62,11 @@ function errorDetail(error: unknown, stepId?: string) {
   if (error instanceof SurfaceError) return error.toErrorDetail(stepId);
   if (error instanceof ReplayError)
     return ErrorDetail.parse({
-      category: error.code.includes('CHECKPOINT') ? 'checkpoint' : 'application',
+      category: error.code.includes('CHECKPOINT')
+        ? 'checkpoint'
+        : error.code.includes('TIMEOUT')
+          ? 'timeout'
+          : 'application',
       code: error.code,
       message: error.message,
       retryable: error.retryable,
@@ -191,6 +196,82 @@ export class ReplayEngine {
       );
   }
 
+  private async verifyTargetFingerprints(
+    artifact: CapabilityArtifactType,
+    adapter: SurfaceAdapter,
+    context: ExecutionContext,
+    events: SurfaceEvent[],
+  ): Promise<void> {
+    const observation = await adapter.observe();
+    for (const fingerprint of artifact.target.fingerprints) {
+      let passed = false;
+      let observed: unknown;
+      try {
+        switch (fingerprint.kind) {
+          case 'urlPathPattern': {
+            const pathname = new URL(observation.url).pathname;
+            passed = new RegExp(fingerprint.pattern).test(pathname);
+            observed = { pathname };
+            break;
+          }
+          case 'titlePattern':
+            passed = new RegExp(fingerprint.pattern).test(observation.title);
+            observed = { title: observation.title };
+            break;
+          case 'requiredText': {
+            const result = await adapter.evaluateCheckpoint(
+              Checkpoint.parse({
+                kind: 'textPresent',
+                description: `Target fingerprint ${fingerprint.id}`,
+                text: fingerprint.text,
+              }),
+              context,
+            );
+            passed = result.passed;
+            observed = result.observedState;
+            break;
+          }
+          case 'requiredTarget': {
+            const target = artifact.steps
+              .map((step) => ('target' in step.action ? step.action.target : undefined))
+              .find((candidate) => candidate?.description === fingerprint.targetDescription);
+            if (target) {
+              const result = await adapter.evaluateCheckpoint(
+                Checkpoint.parse({
+                  kind: 'elementVisible',
+                  description: `Target fingerprint ${fingerprint.id}`,
+                  target,
+                }),
+                context,
+              );
+              passed = result.passed;
+              observed = result.observedState;
+            } else observed = { targetDescriptionResolved: false };
+            break;
+          }
+          case 'frameStructure':
+            observed = { supported: false };
+            break;
+        }
+      } catch (error: unknown) {
+        observed = { error: error instanceof Error ? error.name : 'UNKNOWN' };
+      }
+      events.push({
+        timestamp: new Date().toISOString(),
+        eventType: 'target_fingerprint_result',
+        action: `fingerprint:${fingerprint.kind}`,
+        expected: fingerprint.id,
+        observed,
+        ok: passed,
+      });
+      if (!passed)
+        throw new ReplayError(
+          'CHECKPOINT_TARGET_FINGERPRINT_MISMATCH',
+          `Target fingerprint ${fingerprint.id} did not match the live application`,
+        );
+    }
+  }
+
   async run(options: ReplayOptions): Promise<RunResultType> {
     const runId = `replay-${randomUUID()}`;
     const { artifact, contentHash } = options.loadedArtifact;
@@ -198,6 +279,12 @@ export class ReplayEngine {
       options.loadedPolicy.policy,
       options.loadedPolicy.contentHash,
     );
+    const replayDeadline = Date.now() + options.loadedPolicy.policy.maxReplayDurationMs;
+    const remainingReplayMs = () => replayDeadline - Date.now();
+    const assertWithinReplayDeadline = () => {
+      if (remainingReplayMs() <= 0)
+        throw new ReplayError('REPLAY_TIMEOUT', 'Replay exceeded the policy duration limit');
+    };
     const events: SurfaceEvent[] = [];
     let trace: EvidenceReferenceType | undefined;
     let startedTrace = false;
@@ -262,6 +349,7 @@ export class ReplayEngine {
       });
       surfaceStarted = true;
       for (const precondition of artifact.preconditions) {
+        assertWithinReplayDeadline();
         this.assertNotCancelled(options);
         guard.assertCanAct();
         const result = await options.adapter.evaluateCheckpoint(precondition, context);
@@ -278,6 +366,7 @@ export class ReplayEngine {
       }
 
       for (const step of artifact.steps) {
+        assertWithinReplayDeadline();
         this.assertNotCancelled(options);
         const result = await this.executeStep(
           step,
@@ -304,6 +393,7 @@ export class ReplayEngine {
             }
           },
           guard,
+          remainingReplayMs,
           async (decision, pendingStep, retryable) =>
             this.pauseForIntervention({
               options,
@@ -320,6 +410,9 @@ export class ReplayEngine {
               context: replayContext,
             }),
         );
+        assertWithinReplayDeadline();
+        if (step === artifact.steps[0])
+          await this.verifyTargetFingerprints(artifact, options.adapter, replayContext, events);
         lastCompletedStepId = step.id;
         if (result.outcome) {
           const evidence = await this.finishEvidence(
@@ -372,6 +465,7 @@ export class ReplayEngine {
         throw new ReplayError('REPLAY_CONTEXT_MISSING', 'Replay context was not initialized');
       guard.assertCanAct();
       this.assertNotCancelled(options);
+      assertWithinReplayDeadline();
       const success = await options.adapter.evaluateCheckpoint(artifact.success, replayContext);
       events.push({
         timestamp: new Date().toISOString(),
@@ -940,6 +1034,7 @@ export class ReplayEngine {
     prepareRecovery: () => Promise<void>,
     resumeTrace: () => Promise<void>,
     guard: AutomationActionGuard,
+    remainingReplayMs: () => number,
     handleIntervention: (
       decision: ReturnType<PolicyEngine['decide']>,
       step: CapabilityStepType,
@@ -952,6 +1047,8 @@ export class ReplayEngine {
     let recoveryUsed = false;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       guard.assertCanAct();
+      if (remainingReplayMs() <= 0)
+        throw new ReplayError('REPLAY_TIMEOUT', 'Replay exceeded the policy duration limit');
       if (step.recovery.kind === 'reauthenticate') {
         guard.assertCanAct();
         const expired = await adapter.evaluateCheckpoint(step.recovery.sessionExpired, context);
@@ -977,6 +1074,7 @@ export class ReplayEngine {
             policyEngine,
             runId,
             guard,
+            remainingReplayMs,
           );
           recoveryUsed = true;
           attempts = Math.max(attempts, attempt + 1);
@@ -1025,7 +1123,11 @@ export class ReplayEngine {
         return {};
       }
       guard.assertCanAct();
-      const actionResult = await adapter.execute(step.action, { ...context, stepId: step.id });
+      const actionResult = await adapter.execute(step.action, {
+        ...context,
+        stepId: step.id,
+        actionTimeoutMs: Math.min(step.timeoutMs, Math.max(1, remainingReplayMs())),
+      });
       if (step.action.kind === 'navigate') countNavigation();
       events.push({
         timestamp: new Date().toISOString(),
@@ -1062,6 +1164,7 @@ export class ReplayEngine {
             policyEngine,
             runId,
             guard,
+            remainingReplayMs,
           );
           recoveryUsed = true;
           attempts = Math.max(attempts, attempt + 1);
@@ -1077,6 +1180,8 @@ export class ReplayEngine {
           stepId: step.id,
           action: `checkpoint:${checkpoint.kind}`,
           durationMs: checkpoint.durationMs,
+          expected: checkpoint.description,
+          observed: checkpoint.observedState,
           ok: checkpoint.passed,
           ...(checkpoint.error ? { errorCode: checkpoint.error.code } : {}),
         });
@@ -1107,6 +1212,7 @@ export class ReplayEngine {
             policyEngine,
             runId,
             guard,
+            remainingReplayMs,
           );
           recoveryUsed = true;
           attempts = Math.max(attempts, attempt + 1);
@@ -1144,6 +1250,8 @@ export class ReplayEngine {
       if (attempt < attempts && canRetry(step, code)) {
         guard.assertCanAct();
         const delay = delayMs(step, attempt);
+        if (delay >= remainingReplayMs())
+          throw new ReplayError('REPLAY_TIMEOUT', 'Replay exceeded the policy duration limit');
         if (delay > 0) await new Promise<void>((resolve) => setTimeout(resolve, delay));
         guard.assertCanAct();
         continue;
@@ -1187,6 +1295,7 @@ export class ReplayEngine {
     policyEngine: PolicyEngine,
     runId: string,
     guard: AutomationActionGuard,
+    remainingReplayMs: () => number,
   ): Promise<void> {
     if (step.recovery.kind !== 'reauthenticate') return;
     const recoveryId = `${runId}-${step.id}-recovery`;
@@ -1201,6 +1310,8 @@ export class ReplayEngine {
     });
     for (const recoveryStep of step.recovery.steps) {
       guard.assertCanAct();
+      if (remainingReplayMs() <= 0)
+        throw new ReplayError('REPLAY_TIMEOUT', 'Replay exceeded the policy duration limit');
       const decision = policyEngine.decide(
         recoveryStep.action,
         { id: recoveryStep.id },
@@ -1230,6 +1341,7 @@ export class ReplayEngine {
       const result = await adapter.execute(recoveryStep.action, {
         ...context,
         stepId: recoveryStep.id,
+        actionTimeoutMs: Math.min(recoveryStep.timeoutMs, Math.max(1, remainingReplayMs())),
       });
       if (!result.ok)
         throw new ReplayError('RECOVERY_FAILED', 'Authentication recovery action failed');
@@ -1241,6 +1353,8 @@ export class ReplayEngine {
         stepId: recoveryStep.id,
         action: `checkpoint:${checkpoint.kind}`,
         recoveryId,
+        expected: checkpoint.description,
+        observed: checkpoint.observedState,
         ok: checkpoint.passed,
       });
       if (!checkpoint.passed)
@@ -1254,6 +1368,8 @@ export class ReplayEngine {
       stepId: step.id,
       action: `checkpoint:${authenticated.kind}`,
       recoveryId,
+      expected: authenticated.description,
+      observed: authenticated.observedState,
       ok: authenticated.passed,
     });
     if (!authenticated.passed)

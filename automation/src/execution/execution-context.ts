@@ -10,5 +10,6 @@ export interface ExecutionContext {
   readonly outputShapes?: Readonly<Record<string, DataShapeType>>;
   readonly runId: string;
   readonly stepId?: string;
+  readonly actionTimeoutMs?: number;
   readonly logger?: Logger;
 }

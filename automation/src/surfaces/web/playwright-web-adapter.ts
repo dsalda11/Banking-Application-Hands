@@ -72,6 +72,9 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
       description,
     };
   }
+  private actionTimeout(context: ExecutionContext): number {
+    return Math.min(context.actionTimeoutMs ?? this.session.timeoutMs, this.session.timeoutMs);
+  }
   private async actionResult(
     action: CapabilityActionType,
     context: ExecutionContext,
@@ -124,6 +127,7 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
     action: CapabilityActionType,
     context: ExecutionContext,
   ): Promise<SurfaceActionResult> {
+    const timeout = this.actionTimeout(context);
     return this.actionResult(action, context, async () => {
       switch (action.kind) {
         case 'navigate': {
@@ -138,16 +142,16 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
           this.session.assertAllowed(raw);
           await this.page().goto(raw, {
             waitUntil: 'domcontentloaded',
-            timeout: this.session.timeoutMs,
+            timeout,
           });
           this.session.assertAllowed(this.page().url());
           return {};
         }
         case 'activate': {
           const resolved = await resolveTarget(this.page(), action.target, context);
-          await resolved.locator.click({ timeout: this.session.timeoutMs });
+          await resolved.locator.click({ timeout });
           await this.page()
-            .waitForLoadState('domcontentloaded', { timeout: this.session.timeoutMs })
+            .waitForLoadState('domcontentloaded', { timeout })
             .catch(() => undefined);
           this.session.assertAllowed(this.page().url());
           return { target: this.facts(resolved, action.target.description) };
@@ -157,15 +161,15 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
           if (!(await resolved.locator.isEditable()))
             throw new SurfaceError('ELEMENT_NOT_EDITABLE', action.target.description);
           const value = resolveStringValue(action.value, context);
-          if (action.clear) await resolved.locator.fill(value);
-          else await resolved.locator.pressSequentially(value);
+          if (action.clear) await resolved.locator.fill(value, { timeout });
+          else await resolved.locator.pressSequentially(value, { timeout });
           return { target: this.facts(resolved, action.target.description) };
         }
         case 'selectOption': {
           const resolved = await resolveTarget(this.page(), action.target, context);
           const value = resolveStringValue(action.value, context);
           try {
-            await resolved.locator.selectOption(value);
+            await resolved.locator.selectOption(value, { timeout });
           } catch (error: unknown) {
             throw new SurfaceError(
               'OPTION_NOT_FOUND',
@@ -180,7 +184,7 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
           const target = action.target
             ? await resolveTarget(this.page(), action.target, context)
             : undefined;
-          if (target) await target.locator.press(action.key);
+          if (target) await target.locator.press(action.key, { timeout });
           else await this.page().keyboard.press(action.key);
           return target
             ? { target: this.facts(target, action.target?.description ?? 'keyboard target') }
@@ -189,7 +193,7 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
         case 'scroll': {
           if (action.target) {
             const resolved = await resolveTarget(this.page(), action.target, context);
-            await resolved.locator.scrollIntoViewIfNeeded();
+            await resolved.locator.scrollIntoViewIfNeeded({ timeout });
             return { target: this.facts(resolved, action.target.description) };
           }
           await this.page().mouse.wheel(
@@ -199,7 +203,7 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
           return {};
         }
         case 'wait': {
-          const deadline = Date.now() + this.session.timeoutMs;
+          const deadline = Date.now() + timeout;
           while (Date.now() < deadline) {
             const result = await this.evaluateCheckpoint(action.condition, context);
             if (result.passed) return {};
@@ -210,8 +214,8 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
         case 'extract': {
           const resolved = await resolveTarget(this.page(), action.target, context);
           const raw = await resolved.locator
-            .inputValue()
-            .catch(async () => resolved.locator.innerText());
+            .inputValue({ timeout })
+            .catch(async () => resolved.locator.innerText({ timeout }));
           const output = applyTransform(action.transform, raw);
           context.outputs[action.output] = output;
           if (context.outputShapes?.[action.output]) {

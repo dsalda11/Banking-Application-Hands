@@ -1,0 +1,24 @@
+{
+  "status": "failure",
+  "runId": "replay-5a0d56c0-1b01-4bcd-bd5a-ba7ddb8ffbe1",
+  "artifactId": "banking.lookup-customer-account",
+  "artifactVersion": "1.0.0",
+  "artifactHash": "1620181360935eb7470e8ba3274102244c119f1c9619e27ad909104ec44146f9",
+  "error": {
+    "category": "policy",
+    "code": "POLICY_DENIED",
+    "message": "Navigation origin or route is not allowed",
+    "retryable": false,
+    "evidence": []
+  },
+  "evidence": [
+    {
+      "evidenceId": "replay-events.jsonl",
+      "kind": "eventLog",
+      "path": "runs/replay-5a0d56c0-1b01-4bcd-bd5a-ba7ddb8ffbe1/events.jsonl",
+      "sanitization": "sanitized",
+      "mediaType": "application/x-ndjson"
+    }
+  ],
+  "completedAt": "2026-09-30T22:32:08.188Z"
+}

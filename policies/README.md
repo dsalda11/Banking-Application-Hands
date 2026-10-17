@@ -6,6 +6,7 @@ This directory stores checked-in, non-secret allowlists and risk policies. Tenan
 
 Policies are validated and hashed before the browser starts. Replay evaluates the policy during preflight and again before every action attempt. A denial is terminal; no artifact or runtime value can override it.
 
-`local-bank-discovery.v1.json` applies the same fail-closed boundary to Step 9: local routes only,
-read/input actions only, declared secret references only, no screenshots or traces, no uploads,
-downloads, scripts, external navigation, consequential actions, or model-proposed policy changes.
+`local-bank-discovery.v1.json` applies the same fail-closed boundary to bounded discovery and the
+compiled genuine artifact: local routes only, read/input actions only, declared secret references
+only, no screenshots or traces, no uploads, downloads, scripts, external navigation, consequential
+actions, or model-proposed policy changes.

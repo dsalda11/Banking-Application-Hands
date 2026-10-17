@@ -1,0 +1,25 @@
+{
+  "observationId": "obs-001",
+  "capturedAt": "2026-10-08T04:30:19.031Z",
+  "url": "http://127.0.0.1:58714/protected",
+  "title": "(untitled)",
+  "headings": [
+    "Protected"
+  ],
+  "visibleText": [
+    "RECOVERED_OUTPUT"
+  ],
+  "elements": [],
+  "frames": [
+    {
+      "id": "main",
+      "url": "http://127.0.0.1:58714/protected"
+    }
+  ],
+  "scroll": {
+    "x": 0,
+    "y": 0
+  },
+  "stateFingerprint": "06db745de92686fe73bc4cc1890b04a27dfa97eee044a2f926c281920f48e116",
+  "evidence": []
+}

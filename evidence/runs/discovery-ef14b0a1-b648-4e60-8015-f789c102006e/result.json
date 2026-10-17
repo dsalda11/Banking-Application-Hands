@@ -1,0 +1,7 @@
+{
+  "status": "businessOutcome",
+  "runId": "discovery-ef14b0a1-b648-4e60-8015-f789c102006e",
+  "outcome": "CUSTOMER_NOT_FOUND",
+  "modelCalls": 7,
+  "actions": 7
+}

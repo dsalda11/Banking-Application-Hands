@@ -213,7 +213,9 @@ describe('Playwright surface fixture', () => {
     expect(result.error).toBeInstanceOf(SurfaceError);
   });
   it('returns explicit missing and ambiguous locator errors without clicking', async () => {
-    await adapter.session.page!.setContent('<button>One</button><button>Two</button>');
+    await adapter.session.page!.setContent(
+      '<button onclick="document.body.dataset.clicked=\'yes\'">One</button><button onclick="document.body.dataset.clicked=\'yes\'">Two</button>',
+    );
     const missing = await adapter.execute(
       {
         kind: 'activate',
@@ -242,5 +244,51 @@ describe('Playwright surface fixture', () => {
     );
     expect(ambiguous.error?.code).toBe('LOCATOR_AMBIGUOUS');
     expect(ambiguous.error?.message).toContain('role:2');
+    expect(await adapter.session.page!.locator('body').getAttribute('data-clicked')).toBeNull();
+  });
+  it('uses a later independent locator only when the preferred locator has no match', async () => {
+    await adapter.session.page!.setContent('<button aria-label="Stable action">Run</button>');
+    const result = await adapter.execute(
+      {
+        kind: 'activate',
+        target: {
+          description: 'fallback control',
+          candidates: [
+            {
+              strategy: 'role',
+              role: 'button',
+              name: { kind: 'literal', value: 'Missing preferred name' },
+            },
+            {
+              strategy: 'accessibility',
+              role: 'button',
+              name: { kind: 'literal', value: 'Stable action' },
+            },
+          ],
+          match: 'exactlyOne',
+        },
+      },
+      context,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.target).toMatchObject({ strategy: 'accessibility', candidateIndex: 1 });
+  });
+  it('bounds waits by the declared action timeout', async () => {
+    await adapter.session.page!.setContent('<main>Never ready</main>');
+    const started = Date.now();
+    const result = await adapter.execute(
+      {
+        kind: 'wait',
+        condition: Checkpoint.parse({
+          kind: 'textPresent',
+          description: 'eventually ready',
+          text: 'Ready now',
+        }),
+      },
+      { ...context, actionTimeoutMs: 75 },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatchObject({ code: 'CHECKPOINT_FAILED', retryable: true });
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });

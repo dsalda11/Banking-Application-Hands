@@ -1,0 +1,32 @@
+{
+  "status": "failure",
+  "runId": "replay-52e384d4-f0ce-4634-8448-48832e80b03b",
+  "artifactId": "fixture-second-expiration",
+  "artifactVersion": "1.0.0",
+  "artifactHash": "0a9aa68134cf24258b6bd8bd2c69cc2e7bedfc435d12c5d22ac2d7ab83b7407a",
+  "error": {
+    "category": "application",
+    "code": "SESSION_EXPIRED",
+    "message": "Session expired again after recovery",
+    "stepId": "open-protected",
+    "retryable": false,
+    "evidence": []
+  },
+  "evidence": [
+    {
+      "evidenceId": "surface-replay-failure.png",
+      "kind": "screenshot",
+      "path": "authentication-second-expiration/runs/replay-52e384d4-f0ce-4634-8448-48832e80b03b/replay-failure.png",
+      "sanitization": "sanitized",
+      "mediaType": "image/png"
+    },
+    {
+      "evidenceId": "surface-events.jsonl",
+      "kind": "eventLog",
+      "path": "authentication-second-expiration/runs/replay-52e384d4-f0ce-4634-8448-48832e80b03b/events.jsonl",
+      "sanitization": "sanitized",
+      "mediaType": "application/x-ndjson"
+    }
+  ],
+  "completedAt": "2026-10-08T04:30:19.407Z"
+}

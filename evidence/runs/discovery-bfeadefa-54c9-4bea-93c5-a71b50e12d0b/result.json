@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "runId": "discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b",
+  "outputs": {
+    "accountNumber": "2023",
+    "currentBalance": {
+      "amount": "31444",
+      "currency": "USD"
+    }
+  },
+  "modelCalls": 9,
+  "actions": 9
+}

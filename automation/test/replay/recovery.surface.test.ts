@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -320,6 +320,18 @@ async function run(mode: Mode) {
   const policyPath = path.join(scratch, 'policy.json');
   await writeFile(artifactPath, JSON.stringify(artifact(baseUrl, `fixture-${mode}`)));
   await writeFile(policyPath, JSON.stringify(policy(baseUrl)));
+  const curatedRoot =
+    process.env.CURATED_RECOVERY_EVIDENCE_DIRECTORY && mode !== 'permission'
+      ? path.resolve(
+          process.env.CURATED_RECOVERY_EVIDENCE_DIRECTORY,
+          mode === 'recover' ? 'authentication-recovery' : 'authentication-second-expiration',
+        )
+      : undefined;
+  if (curatedRoot) {
+    await mkdir(curatedRoot, { recursive: true });
+    await copyFile(artifactPath, path.join(curatedRoot, 'artifact.json'));
+    await copyFile(policyPath, path.join(curatedRoot, 'policy.json'));
+  }
   const result = await new ReplayEngine().run({
     loadedArtifact: await loadArtifact(artifactPath),
     loadedPolicy: await loadPolicy(policyPath),
@@ -329,11 +341,11 @@ async function run(mode: Mode) {
       FIXTURE_PASSWORD: sentinels.password,
     },
     baseUrl,
-    evidenceDirectory: scratch,
+    evidenceDirectory: curatedRoot ?? scratch,
     headless: true,
     adapter: new PlaywrightWebAdapter(),
   });
-  const runDirectory = path.join(scratch, 'runs', result.runId);
+  const runDirectory = path.join(curatedRoot ?? scratch, 'runs', result.runId);
   const events = (await readFile(path.join(runDirectory, 'events.jsonl'), 'utf8'))
     .trim()
     .split('\n')

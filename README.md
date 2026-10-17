@@ -1,127 +1,155 @@
-# Banking Application Software
+# LLM Discovery and Deterministic Banking Automation
 
-An intentionally insecure Spring Boot/JSP/MySQL banking demonstration app using fake data. Keep it local; do not use real credentials or deploy it publicly.
+This repository combines a local Spring Boot/JSP/MySQL banking application with a TypeScript
+browser-automation system. The automation accepts a natural-language goal, uses a genuine LLM only
+during bounded discovery, records a sanitized trace, and compiles successful observations into a
+typed, versioned capability artifact. An artifact must pass exact-hash human review before the
+model-free replay engine can execute it and return typed outputs or a declared business outcome.
 
-## Start
+Policy checks sit between every proposed or replayed action and the UI. When automation cannot
+continue safely, the implemented handoff path can pause at an action boundary, transfer a fenced
+lease to a human on the same live browser session, and Resume, Complete, Abort, or Reclaim control.
 
-Requires Docker Desktop and Compose v2.
-
-```bash
-docker compose up --build -d
-```
-
-Compose uses safe local demo defaults for the database and application settings. Override them
-through the shell or CI environment when needed, for example `APP_PORT=8081 docker compose up -d`.
-No environment template is required or tracked.
-
-Email remains disabled by default. If it is deliberately enabled, provide
-`SPRING_MAIL_USERNAME` and `SPRING_MAIL_PASSWORD` through the runtime environment. Never commit
-mail credentials or place them in a repository-local configuration file.
-
-Open <http://127.0.0.1:8080/index> and log in with:
+## Architecture
 
 ```text
-Username: admin
-Password: admin
+Discovery
+goal -> DiscoveryOrchestrator -> PlannerClient -> OpenAI provider adapter
+     -> schema/observation validation -> PolicyEngine -> SurfaceAdapter -> Playwright -> UI
+     -> sanitized discovery trace
+
+Compilation and lifecycle
+validated trace -> ArtifactCompiler -> canonical draft artifact
+                -> exact-hash human review -> fresh verification -> promotion eligibility
+
+Production replay
+approved artifact + runtime inputs/secrets -> PolicyEngine -> ReplayEngine
+                                           -> SurfaceAdapter -> Playwright -> UI
+                                           -> typed result + sanitized evidence
+                                           (no planner or provider call)
+
+Human intervention
+safe pause -> automation lease released -> human claims fenced lease -> same browser session
+           -> Resume / Complete / Abort / Reclaim -> sanitized lifecycle evidence
 ```
 
-The app is built from source as an executable WAR. MySQL runs in a separate healthy container, initializes from `database/database.sql`, and persists in a named Docker volume. Only the app is published on `127.0.0.1`; MySQL is not exposed to the host. Email is disabled by default.
+The `SurfaceAdapter` is provider-neutral; Playwright is contained in the web implementation. The
+artifact registry and lifecycle code keep draft, reviewed, verified, promotion-eligible, and active
+states distinct. Evidence writers retain structured, sanitized events instead of raw browser or
+provider payloads. See [REPORT.md](REPORT.md) for the design trade-offs and
+[ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) for the concise implementation record.
 
-## Commands
+## Prerequisites
 
-```bash
-docker compose ps
-docker compose logs --no-color
-docker compose stop
-docker compose down
-docker compose up --build -d
-```
+- Node.js 24 and npm (the automation package rejects other Node majors)
+- Docker with Docker Compose v2
+- Playwright Chromium, installed by the repository script below
+- JDK 8 or newer only when running the Spring/Maven checks outside Docker; the container build uses
+  Java 8
 
-Reset the fake database:
+Runtime-only variables:
 
-```bash
-docker compose down
-docker volume rm banking-application-software_banking-mysql-data
-docker compose up --build -d
-```
+| Variable | Purpose | Required |
+| --- | --- | --- |
+| `BANK_STAFF_USERNAME` | Local synthetic staff login | Replay and discovery |
+| `BANK_STAFF_PASSWORD` | Local synthetic staff login | Replay and discovery |
+| `OPENAI_API_KEY` | Reviewer's own OpenAI credential | Genuine discovery only |
+| `OPENAI_MODEL` | Provider model name; code has a safe configuration default | Genuine discovery only |
+| `BANK_APP_BASE_URL` | Banking UI origin; defaults to `http://127.0.0.1:8080` | No |
+| `BROWSER_HEADLESS` | `true` for unattended runs; defaults to `false` | No |
 
-For a port conflict, set `APP_PORT=8081` in the command environment. For startup or JSP problems,
-check `docker compose logs --no-color app`; for database initialization problems, check
-`docker compose logs --no-color db`. SQL initialization runs only when the database volume is new.
+`BANK_NON_STAFF_USERNAME`, `BANK_NON_STAFF_PASSWORD`, and `BANK_CUSTOMER_USERNAME` support focused
+proof commands but are not needed for the two reviewer paths below. Docker Compose also accepts
+`APP_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, and `MYSQL_ROOT_PASSWORD`; its
+defaults are suitable only for the local synthetic demonstration.
 
-## Running the automation
+## Setup from a fresh clone
 
-Run these commands from the repository root. The automation workspace requires Node.js 24 and npm;
-Docker Desktop with Compose v2 is required for the banking application. Install the automation
-dependencies and its project-local Chromium browser once:
+From the repository root:
 
 ```bash
 cd automation
-npm install
+npm ci
 npm run browser:install
 cd ..
+
+docker compose up --build -d
+docker compose ps
 ```
 
-The banking credentials below belong to the local synthetic demo application. Supply them only to
-the process environment; do not put credentials in a repository file.
+Wait until both `db` and `app` report healthy. The application is then available at
+<http://127.0.0.1:8080/index>. The app container builds the executable WAR from source; MySQL is not
+published to the host. For a host-port conflict, prefix the startup command with `APP_PORT=8081` and
+set `BANK_APP_BASE_URL` to the matching URL for automation runs.
 
-### Option A — deterministic replay, no LLM credentials required
-
-Start the banking application from the repository root:
+The local synthetic staff credential must be supplied to the automation process at runtime. Do not
+store it in the repository. To verify the source outside Docker:
 
 ```bash
-docker compose up --build -d
+./mvnw test
+./mvnw package
+
+cd automation
+npm run schema:check
+npm run build
 ```
 
-Then run the checked-in capability artifact. Replace only the banking credential placeholders with
-the local demo staff credentials:
+## Demo A — deterministic replay without an LLM
+
+Replay executes the reviewed artifact directly. It has no `PlannerClient`, discovery orchestrator,
+provider fallback, or model call, so `OPENAI_API_KEY` and `OPENAI_MODEL` are not required.
+
+After starting Compose, validate the exact checked-in artifact and run the successful customer:
 
 ```bash
 cd automation
 export BANK_STAFF_USERNAME="<local-demo-staff-username>"
 export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+
+npm run artifact:validate -- \
+  --artifact ../artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json
+
 BROWSER_HEADLESS=true npm run replay -- \
-  --artifact ../artifacts/lookup-customer-account.v1.example.json \
-  --policy ../policies/local-bank-readonly.v1.json \
+  --artifact ../artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json \
+  --policy ../policies/local-bank-discovery.v1.json \
   --input customerUsername=customer
 ```
 
-The command exits `0` and prints a JSON result containing these success fields (run IDs, hashes,
-evidence paths, and timestamps vary):
+Validation prints the canonical hash
+`1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095`. Replay exits `0` with a
+`success` result whose dynamically extracted outputs include:
 
 ```json
 {
-  "status": "success",
-  "outputs": {
-    "accountNumber": "2023",
-    "currentBalance": { "amount": "31444", "currency": "USD" }
-  }
+  "accountNumber": "2023",
+  "currentBalance": { "amount": "31444", "currency": "USD" }
 }
 ```
 
-The existing not-found demonstration uses the same saved artifact:
+The declared missing-customer case is:
 
 ```bash
 BROWSER_HEADLESS=true npm run replay -- \
-  --artifact ../artifacts/lookup-customer-account.v1.example.json \
-  --policy ../policies/local-bank-readonly.v1.json \
+  --artifact ../artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json \
+  --policy ../policies/local-bank-discovery.v1.json \
   --input customerUsername=missing-user
 ```
 
-It prints `"status":"businessOutcome"` and `"code":"CUSTOMER_NOT_FOUND"`, then exits with code
-`2` because that is a declared business outcome. Replay is deterministic and performs no LLM calls;
-it does not require `OPENAI_API_KEY` or `OPENAI_MODEL`.
+It prints `status: "businessOutcome"` with `code: "CUSTOMER_NOT_FOUND"` and exits `2`; this is a
+known domain result, not an infrastructure failure.
 
-### Option B — new discovery with your own provider credentials
+## Demo B — genuine discovery with your own provider credential
 
-Leave the banking application running and, from `automation/`, provide the banking credentials plus
-your own OpenAI runtime credential and a model supported by your provider account:
+Discovery is intentionally separate from replay. With Compose running, provide your own credential
+and model configuration at runtime:
 
 ```bash
+cd automation
 export BANK_STAFF_USERNAME="<local-demo-staff-username>"
 export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
 export OPENAI_API_KEY="<your-own-key>"
 export OPENAI_MODEL="<supported-model>"
+
 BROWSER_HEADLESS=true npm run discover -- \
   --goal ../artifacts/goals/lookup-customer-account.goal.json \
   --policy ../policies/local-bank-discovery.v1.json \
@@ -129,25 +157,60 @@ BROWSER_HEADLESS=true npm run discover -- \
   --input customerUsername=customer
 ```
 
-All secrets are supplied only at runtime. No `.env` or `.env.example` files are tracked, and
-credentials must never be committed. Deterministic replay remains available without model
-credentials. The checked-in sanitized
-[`evidence/genuine-provider/preflight-summary.json`](evidence/genuine-provider/preflight-summary.json)
-documents the author's genuine provider-backed discovery run without retaining any credential
-value. New run evidence is written below the ignored `evidence/runs/` directory.
+The command performs bounded one-action-at-a-time discovery and writes a sanitized trace under the
+ignored runtime evidence area. Compilation, human review of the exact canonical hash, verification,
+and promotion remain deliberate, separate lifecycle commands; discovery does not approve or activate
+an artifact.
 
-## Discovery compiler and replay
+Secrets are supplied only at runtime. No `.env` or `.env.example` file is tracked, and credentials
+must never be committed. The author's key is neither required nor included. The checked-in evidence
+demonstrates the genuine `openai / gpt-5.6-terra` run that produced the reviewed capability.
 
-The `automation/` workspace implements bounded discovery, integrity-checked JSONL traces, a
-model-free deterministic artifact compiler, hash-bound human review, fresh-session replay
-verification, and conflict-safe promotion. Generated drafts and lifecycle records live under
-`artifacts/drafts/` and are not visible to the active artifact registry. The hand-authored banking
-artifact is not overwritten or read as a compiler plan.
+## Evidence
 
-See [automation/src/compiler/README.md](automation/src/compiler/README.md) for trace acceptance rules,
-multi-trace merging, dead-end removal, parameterization, locator/checkpoint selection, provenance,
-lifecycle gates, and exact CLI commands. Fake-planner evidence is labeled separately from genuine
-OpenAI provenance.
+[evidence/README.md](evidence/README.md) is the submission index. Its compact manifest-backed set
+demonstrates genuine LLM discovery, successful model-free replay, `CUSTOMER_NOT_FOUND`, policy and
+permission denials, bounded authentication recovery, terminal second session expiration, same-session
+human takeover plus Resume, and human Abort.
+
+The reviewed genuine artifact is
+`banking.lookup-customer-account.genuine-compiled@1.0.2`, canonical hash
+`1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095`. It is verified and
+promotion-eligible but intentionally remains a draft because active-registry promotion is a separate
+human lifecycle action.
+
+## Verification
+
+Run automation checks from `automation/`:
+
+```bash
+npm run format
+npm run lint
+npm run typecheck
+npm run test
+npm run test:surface
+npm run schema:check
+npm run build
+npm run doctor
+npm run security:scan
+npm run security:dependencies
+npm run evidence:check
+```
+
+`doctor` validates Node 24, writable repository paths, and the presence of banking/provider runtime
+configuration without printing values. It is expected to fail when required genuine-discovery
+configuration is absent. Run the Java checks from the repository root with `./mvnw test` and
+`./mvnw package`.
+
+## Security notes
+
+Secrets are runtime-only, and artifacts contain secret reference names rather than values. Genuine
+provider calls use structured output, no provider tools, and disabled provider-side response storage;
+raw requests and responses are not retained. Raw Playwright trace archives are intentionally disabled
+because DOM, network, and storage snapshots can preserve sensitive state. Checked-in evidence is a
+selected, sanitized subset and is scanned along with tracked files and reachable Git history. These
+controls reduce exposure but do not turn the intentionally insecure local banking target or the
+single-process operator interface into production systems. Deterministic replay requires no LLM.
 
 ## License
 

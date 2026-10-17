@@ -1,0 +1,18 @@
+{
+  "status": "aborted",
+  "runId": "replay-cd1a62b0-4175-48ca-b850-cd2347946196",
+  "artifactId": "banking.lookup-customer-account",
+  "artifactVersion": "1.0.0",
+  "artifactHash": "2e35accc3bb01c92398bf1e5bdb6fd1a1a3f7ad9431f891d9b96c8cd53668092",
+  "code": "ABORTED_BY_HUMAN",
+  "evidence": [
+    {
+      "evidenceId": "surface-events.jsonl",
+      "kind": "eventLog",
+      "path": "evidence/runs/replay-cd1a62b0-4175-48ca-b850-cd2347946196/events.jsonl",
+      "sanitization": "sanitized",
+      "mediaType": "application/x-ndjson"
+    }
+  ],
+  "completedAt": "2026-10-01T02:12:13.246Z"
+}

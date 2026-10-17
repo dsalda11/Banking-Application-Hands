@@ -69,7 +69,7 @@ export class PolicyEngine {
             'Authentication recovery is disabled by policy',
           );
         for (const recoveryStep of step.recovery.steps)
-          this.assertAction(recoveryStep.action, recoveryStep.id, artifact, true);
+          this.assertAction(recoveryStep.action, { id: recoveryStep.id }, artifact, true);
       }
     }
   }
@@ -190,16 +190,16 @@ export class PolicyEngine {
   }
 
   private assertStaticAction(step: CapabilityStepType, artifact: CapabilityArtifactType): void {
-    this.assertAction(step.action, step.id, artifact, false);
+    this.assertAction(step.action, step, artifact, false);
   }
 
   private assertAction(
     action: CapabilityActionType,
-    stepId: string,
+    step: CapabilityStepType | { readonly id: string },
     artifact: CapabilityArtifactType,
     recovery: boolean,
   ): void {
-    const decision = this.decide(action, { id: stepId }, 'preflight', 1, 0, recovery ? 1 : 0);
+    const decision = this.decide(action, step, 'preflight', 1, 0, recovery ? 1 : 0);
     // Intervention is a valid, explicitly configured preflight result. Runtime
     // replay decides whether to return it immediately or pause interactively.
     if (decision.decision === 'deny')

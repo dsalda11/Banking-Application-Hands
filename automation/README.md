@@ -1,313 +1,147 @@
-# Automation Engine Scaffold
+# Automation engine
 
-This is the isolated TypeScript automation engine that will eventually operate the separate Java/JSP banking application through its UI. It does not query the banking database or modify the Java target.
+This directory contains the Node.js 24 TypeScript system for discovery, compilation, deterministic
+replay, policy enforcement, evidence recording, and same-session human intervention. It automates
+the banking application through its rendered UI; it does not query the database or call application
+controllers.
 
-## Requirements
+Use the repository [README](../README.md) for fresh-clone setup and the two reviewer demos. This file
+covers lower-level development and lifecycle commands.
 
-- Node.js 24 LTS (`.nvmrc` is set to `24`)
-- npm
+## Runtime configuration
 
-## Install and verify
+Configuration is read from the process environment. No `.env` or `.env.example` file is tracked.
 
-```bash
-npm install
-npm run doctor
-npm run check
-```
+- `BANK_STAFF_USERNAME`, `BANK_STAFF_PASSWORD`: required by staff replay and discovery.
+- `OPENAI_API_KEY`: required only by genuine OpenAI discovery.
+- `OPENAI_MODEL`: discovery model; defaults to `gpt-5.6-terra` when omitted.
+- `BANK_APP_BASE_URL`: defaults to `http://127.0.0.1:8080`.
+- `BROWSER_HEADLESS`: defaults to `false`.
+- `OPERATOR_HOST`, `OPERATOR_PORT`: loopback operator endpoint configuration.
+- `ARTIFACTS_DIR`, `POLICIES_DIR`, `EVIDENCE_DIR`: repository-relative storage overrides.
+- `DISCOVERY_MAX_MODEL_CALLS`, `DISCOVERY_MAX_ACTIONS`, `DISCOVERY_TIMEOUT_MS`,
+  `DISCOVERY_MAX_REPEATED_STATES`, `DISCOVERY_MAX_CONSECUTIVE_FAILURES`: bounded discovery limits.
+- `DISCOVERY_SEND_SCREENSHOTS`: permits sanitized discovery screenshots only when both runtime and
+  goal policy allow them.
 
-Configuration comes from the process environment. No environment template is required or tracked,
-and real environment files are ignored. Supply values from a shell, CI job, or container runtime;
-the application does not depend on how those variables were created.
+`npm run doctor` reports readiness and configuration-presence booleans without printing secret
+values. Replay itself needs no provider variable.
 
-Required for genuine discovery or banking replay:
-
-```text
-BANK_STAFF_USERNAME
-BANK_STAFF_PASSWORD
-OPENAI_API_KEY       # genuine OpenAI discovery only
-OPENAI_MODEL         # genuine OpenAI discovery only; defaults to gpt-5.6-terra
-```
-
-Optional runtime inputs include `BANK_CUSTOMER_USERNAME`, `BANK_NON_STAFF_USERNAME`, and
-`BANK_NON_STAFF_PASSWORD`. Safe defaults are provided for local, non-secret settings including
-`BANK_APP_BASE_URL=http://127.0.0.1:8080`, `BROWSER_HEADLESS=false`, `OPERATOR_HOST=127.0.0.1`,
-`OPERATOR_PORT=3210`, discovery budgets, and artifact/policy/evidence directories.
-
-Example shell setup (replace placeholders locally; do not commit the command or values):
+## Development commands
 
 ```bash
-export BANK_STAFF_USERNAME='<staff username>'
-export BANK_STAFF_PASSWORD='<staff password>'
-export OPENAI_API_KEY='<OpenAI key>'       # only for genuine discovery
-export OPENAI_MODEL='gpt-5.6-terra'       # optional
-npm run doctor
-```
-
-`doctor` reports only configuration presence booleans and never prints values. Missing required
-variables are reported by name only. Run `npm run security:scan` to scan tracked files and reachable
-Git history for accidental environment files, high-confidence credentials, and hard-coded SMTP
-credentials; the scanner never prints values.
-
-Scaffold verification needs no OpenAI API key, banking credentials, running banking app, Docker, browser installation, or network access after dependencies are installed.
-
-The `doctor` command checks the repository directories, write access, runtime version, base URL, optional credential presence, browser mode, and operator address without printing secret values.
-
-Formatting, linting, type checking, tests, and build are available through the scripts in
-`package.json`. The reviewer-facing discovery and replay commands are below.
-
-The Phase 2 domain contracts live under `src/domain/`; the draft example capability is `../artifacts/lookup-customer-account.v1.example.json`. Generate and check reviewable JSON Schemas with:
-
-```bash
-npm run schema:generate
-npm run schema:check
-```
-
-## Running the automation
-
-The following reviewer paths use the repository's existing CLI commands. Run the banking
-application from the repository root and install the automation dependencies and browser once:
-
-```bash
-docker compose up --build -d
-cd automation
-npm install
+npm ci
 npm run browser:install
-```
 
-### Option A — deterministic replay, no LLM credentials required
-
-From `automation/`, supply only the local synthetic banking application's staff credentials and run
-the checked-in capability artifact:
-
-```bash
-export BANK_STAFF_USERNAME="<local-demo-staff-username>"
-export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
-BROWSER_HEADLESS=true npm run replay -- \
-  --artifact ../artifacts/lookup-customer-account.v1.example.json \
-  --policy ../policies/local-bank-readonly.v1.json \
-  --input customerUsername=customer
-```
-
-A successful run exits `0` and prints JSON containing:
-
-```json
-{
-  "status": "success",
-  "outputs": {
-    "accountNumber": "2023",
-    "currentBalance": { "amount": "31444", "currency": "USD" }
-  }
-}
-```
-
-Run the existing declared not-found outcome with:
-
-```bash
-BROWSER_HEADLESS=true npm run replay -- \
-  --artifact ../artifacts/lookup-customer-account.v1.example.json \
-  --policy ../policies/local-bank-readonly.v1.json \
-  --input customerUsername=missing-user
-```
-
-It prints `"status":"businessOutcome"` and `"code":"CUSTOMER_NOT_FOUND"`, then exits `2`.
-Deterministic replay interprets the saved artifact and performs no LLM calls, so neither
-`OPENAI_API_KEY` nor `OPENAI_MODEL` is required.
-
-### Option B — new discovery with your own provider credentials
-
-With the banking application still running, provide your own OpenAI credential and model
-configuration at runtime, alongside the local demo banking credentials:
-
-```bash
-export BANK_STAFF_USERNAME="<local-demo-staff-username>"
-export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
-export OPENAI_API_KEY="<your-own-key>"
-export OPENAI_MODEL="<supported-model>"
-BROWSER_HEADLESS=true npm run discover -- \
-  --goal ../artifacts/goals/lookup-customer-account.goal.json \
-  --policy ../policies/local-bank-discovery.v1.json \
-  --planner openai \
-  --input customerUsername=customer
-```
-
-Secrets are supplied only through the runtime environment. No `.env` or `.env.example` files are
-tracked, and credentials must never be committed. Deterministic replay does not require model
-credentials. The checked-in sanitized
-[`evidence/genuine-provider/preflight-summary.json`](../evidence/genuine-provider/preflight-summary.json)
-documents the author's genuine provider-backed discovery run without retaining credential values;
-new run evidence is written below the ignored `../evidence/runs/` directory.
-
-## Surface smoke
-
-Install only the project Chromium browser when browser checks are needed:
-
-```bash
-npm run browser:install
-```
-
-Offline checks remain fast and do not launch Chromium:
-
-```bash
+npm run format
+npm run lint
+npm run typecheck
 npm run test
-npm run check
+npm run test:surface
+npm run schema:check
+npm run build
+npm run doctor
+npm run security:scan
+npm run security:dependencies
+npm run evidence:check
 ```
 
-The local scripted banking smoke requires the existing Docker app and ephemeral runtime credentials:
+`npm run test` runs the non-browser Vitest suite and secret-scanner regression tests.
+`npm run test:surface` runs Playwright-backed surface, replay, recovery, and handoff coverage.
+`npm run check` is a convenient offline aggregate, but does not replace the surface, dependency,
+security, or evidence checks listed above.
+
+## Boundaries
+
+- `src/discovery/`: bounded orchestration and `PlannerClient`; the OpenAI adapter emits strict
+  structured decisions and never receives a Playwright handle.
+- `src/compiler/`: integrity-validates sanitized JSONL traces and emits canonical artifacts plus
+  separate lifecycle records.
+- `src/replay/`: validates and interprets artifacts without importing discovery or provider code.
+- `src/policy/`: validates policy documents and fails closed at preflight and before each attempt.
+- `src/surfaces/`: provider-neutral action/checkpoint contract; Playwright stays under `web/`.
+- `src/intervention/`: exclusive leases, generation fencing, loopback operator server, and
+  Resume/Complete/Abort/Reclaim coordination.
+- `src/evidence/` and `src/logging/`: sanitized structured evidence and metadata-only redaction.
+
+The replay engine accepts only declared inputs and secret references, checks target fingerprints,
+resolves locator candidates in order, rejects zero or ambiguous `exactlyOne` matches, enforces
+bounded retries/timeouts, evaluates checkpoints, validates typed outputs, and recognizes declared
+business outcomes.
+
+## Artifact lifecycle commands
+
+All paths below are relative to this directory.
 
 ```bash
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
-  npm run surface:smoke -- --customer-username customer
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
-  npm run surface:smoke -- --customer-username missing-user
-# Or set BANK_CUSTOMER_USERNAME and run the proof alias:
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BANK_CUSTOMER_USERNAME=customer \
-  npm run proof:bank
-```
+npm run trace:validate -- --trace ../evidence/runs/<run-id>/discovery-events.jsonl
 
-Use `BROWSER_HEADLESS=false` for headed local debugging. Screenshots, traces, observations, event logs, and results are written under `../evidence/runs/<run-id>/`, which is ignored. The command is a manually scripted surface proof, not deterministic artifact replay yet.
-
-The provider-neutral `SurfaceAdapter` owns observation, typed action execution, checkpoints, screenshots, traces, and cleanup. Playwright types remain inside `src/surfaces/web/`; the proof workflow only invokes the adapter with existing domain actions. Locator candidates resolve in declared order, with semantic strategies preferred and structured scopes/frame paths preserved. Credentials are runtime-only and screenshots/traces are blocked while a password field is populated.
-
-## Phase 4 artifact replay
-
-The generic replay engine validates the artifact before launching Chromium, binds only declared inputs and secrets, executes its ordered actions through `SurfaceAdapter`, evaluates each declared checkpoint, applies bounded artifact retries, recognizes declared business outcomes, and writes sanitized evidence under `../evidence/runs/<run-id>/`. It is deterministic and non-LLM; it is not discovery or artifact compilation.
-
-```bash
-npm run artifact:list
-npm run artifact:validate -- --artifact ../artifacts/lookup-customer-account.v1.example.json
-
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
-  npm run replay -- \
-    --artifact ../artifacts/lookup-customer-account.v1.example.json \
-    --input customerUsername=customer
-
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
-  npm run replay -- \
-    --artifact ../artifacts/lookup-customer-account.v1.example.json \
-    --input customerUsername=missing-user
-```
-
-The replay command returns exit code `0` for success, `2` for an expected business outcome, and `1` for a failure. Secrets are resolved only from environment names listed in the artifact and are never accepted as CLI inputs.
-
-Policy-controlled replay uses the strict local policy by default; it can also be supplied explicitly:
-
-```bash
-BANK_STAFF_USERNAME=... BANK_STAFF_PASSWORD=... BROWSER_HEADLESS=true \
-  npm run replay -- \
-    --artifact ../artifacts/lookup-customer-account.v1.example.json \
-    --policy ../policies/local-bank-readonly.v1.json \
-    --input customerUsername=customer
-```
-
-Exit codes are `0` success, `1` terminal engine/configuration/policy failure, `2` declared business outcome, `3` declared permission denial, and `4` intervention required. Policy denials, permission denial, session expiration, recovery, locator failures, checkpoint failures, and retry attempts are recorded as sanitized event evidence.
-
-## Recovery fixture and trace retention
-
-`npm run test:surface` includes a loopback-only browser fixture for one bounded authentication recovery, a second-expiration terminal failure, and permission denial without reauthentication. It uses the production artifact loader, policy loader, replay engine, and Playwright adapter; the Java banking application is not modified to force session expiry.
-
-Raw Playwright trace ZIPs are disabled by the local read-only policy because DOM snapshots, network data, and browser state cannot be reliably sanitized. JSONL events, password-safe screenshots, and bounded observations remain the audit evidence. Passwords, cookies, session tokens, and authorization values are confidential; usernames and customer lookup values are identifiers that can legitimately appear in visible UI or declared input data.
-
-## Interactive replay lifecycle
-
-`replay:interactive` uses one `InteractiveReplayLifecycle` for process signals, replay cancellation,
-operator URL delivery, exit-code mapping, and idempotent cleanup. Rejected Resume or Complete
-validation restores human control with a new fencing generation. The operator page tracks monotonic
-coordinator revisions so delayed responses cannot restore an old generation or re-enable stale
-controls. Cancellation is observed only at safe action/checkpoint boundaries; an in-flight atomic
-surface call is allowed to finish.
-
-`SIGINT` exits with code 130 and `SIGTERM` with code 143 after the coordinator, loopback server,
-timers, evidence, and replay surface have closed. Operator tokens are memory-only and invalidated by
-cleanup. This implementation is single-process.
-
-## Step 8 human takeover acceptance
-
-The real-browser acceptance fixture uses the production replay engine, policy engine, Playwright web
-adapter, coordinator, lease manager, operator server, loaders, and JSONL writer. At a safe boundary,
-the same browser, context, target page, cookies, and application session remain allocated while the
-human lease is active. A test-only actor clicks the existing target page directly and is never exposed
-through the operator API. Invalid Resume restores human ownership with a new fencing generation.
-Valid Resume validates the postcondition and skips the human-completed action. Verified Complete
-performs only policy-allowed missing output extraction before validating final success. Abort closes
-both target and operator resources.
-
-```bash
-npm run test:surface -- --run test/intervention/human-takeover.surface.test.ts
-
-BROWSER_HEADLESS=false npm run replay:interactive -- \
-  --artifact ../artifacts/lookup-customer-account.v1.example.json \
-  --policy ../policies/local-bank-human-demo.v1.json \
-  --input customerUsername=customer
-```
-
-For the headed demonstration, open the printed operator URL, claim control, and first try Resume
-before opening customer details. After rejection, use the already-open banking Chromium window to
-select **View Details** for `customer`, then Resume. Expect account `2023` and balance `31444 USD`.
-Run the command again and choose Abort for the separate abort proof. Evidence is written under
-`../evidence/runs/<run-id>/`.
-
-The operator is loopback-only and single-process. Production evolution requires organizational
-authentication, durable distributed fencing, and authenticated remote control without transferring
-raw browser storage or weakening exclusive ownership.
-
-## Step 9 bounded discovery
-
-Discovery proposes one action at a time and never gives the model a Playwright handle. The runtime
-captures a bounded semantic observation, validates the proposal with Zod, rejects stale observation
-IDs/fingerprints, evaluates the fail-closed policy, executes through `SurfaceAdapter`, and records
-the observed result separately from the proposal. Page content is untrusted and cannot change
-policy, budgets, declared secrets, or the action vocabulary.
-
-The loop enforces model-call, action, navigation, wall-clock, repeated-state/action, alternating-loop,
-and consecutive-failure limits. Passwords and usernames declared as secrets are represented to the
-planner only by reference name; values are resolved immediately before an authorized surface action.
-Raw API payloads, browser storage, cookies, raw DOM, and Playwright traces are not retained.
-
-Offline discovery uses `ScriptedPlannerClient`. Production discovery uses the official OpenAI
-JavaScript SDK and Responses API with strict JSON Schema output, `store: false`, no built-in tools,
-one bounded retry, and typed authentication/rate-limit/timeout/refusal/malformed-output errors.
-
-```bash
-# Deterministic observation-driven fake planner (no provider network call)
-npm run discover -- \
+npm run artifact:compile -- \
   --goal ../artifacts/goals/lookup-customer-account.goal.json \
-  --policy ../policies/local-bank-discovery.v1.json \
-  --planner fake \
-  --input customerUsername=customer
+  --trace ../evidence/runs/<successful-run>/discovery-events.jsonl \
+  --trace ../evidence/runs/<outcome-run>/discovery-events.jsonl \
+  --artifact-id <artifact-id> \
+  --version <version>
 
-# Genuine model-backed discovery
-npm run discover -- \
-  --goal ../artifacts/goals/lookup-customer-account.goal.json \
+npm run artifact:review -- \
+  --artifact ../artifacts/drafts/<artifact>.json \
+  --manifest ../artifacts/drafts/<artifact>.compilation.json \
+  --review ../artifacts/drafts/<artifact>.review.json \
+  --approve
+
+npm run artifact:verify -- \
+  --artifact ../artifacts/drafts/<artifact>.json \
+  --review ../artifacts/drafts/<artifact>.review.json \
   --policy ../policies/local-bank-discovery.v1.json \
-  --planner openai \
-  --input customerUsername=customer
+  --input customerUsername=customer \
+  --outcome-input CUSTOMER_NOT_FOUND:customerUsername=missing-user
 ```
 
-The live command reads only `OPENAI_API_KEY`, `OPENAI_MODEL`, and the declared banking secret
-references from the process environment. Discovery JSONL is stored as
-`../evidence/runs/<discovery-run-id>/discovery-events.jsonl`; proposal, policy decision, execution,
-actual result, output candidates, interventions, and stopping conditions are distinct event types.
-Request-human proposals reuse the Step 8 lease/coordinator/operator console and preserve the same
-surface session. Resume always captures a fresh observation, invalidating all pre-handoff element
-IDs. Step 9 produces an integrity-bound typed discovery trace. Step 10 consumes one successful trace
-plus optional declared-outcome/repeated-success traces and compiles only the verified path.
+Review approval binds the canonical artifact hash. Verification uses fresh model-free browser
+sessions. Promotion is separate and conflict-safe:
 
-## Step 10 compiler and automated Step 11 gate
+```bash
+npm run artifact:promote -- \
+  --artifact ../artifacts/drafts/<artifact>.json \
+  --review ../artifacts/drafts/<artifact>.review.json \
+  --verification ../artifacts/drafts/<artifact>.verification.json \
+  --registry <active-registry-directory>
+```
 
-The enriched trace persists sanitized observations, validated proposals, executed typed actions,
-resolved locator candidate indexes, and checkpoint evidence as bounded JSON strings. This is not raw
-DOM or a provider payload. A terminal hash covers every preceding event. The compiler proves locator
-provenance against the referenced observation, removes failed/no-progress exploration, preserves
-input and secret references, emits observed checkpoints and typed extractors, and writes canonical
-artifact bytes plus a separate time-bearing provenance manifest.
+The checked-in `1.0.2` artifact is promotion-eligible but has not been promoted into the active
+registry. Do not treat discovery, review, or verification as implicit promotion.
 
-Lifecycle state is external to deterministic content: draft → validated → review approved → fresh
-replay verified → promotion eligible, or rejected. Review and verification records become invalid
-after a content change. Verification creates independent browser contexts and runs success plus every
-compiled business outcome through the existing model-free replay engine. Promotion is an explicit
-exclusive filesystem copy and registry reload. Draft directories are not active registry inputs.
+## Replay and result contract
 
-The browser fixture executes the fake-planner discovery/compiler/replay slice three consecutive
-times. Banking drafts under `artifacts/drafts/` are labeled fake-planner-derived. Genuine OpenAI
-provenance is claimed only when a provider-backed trace reaches observed success; an authorization or
-provider failure never produces a synthetic substitute. Exact commands are in `src/compiler/README.md`.
+The exact reviewer replay commands and expected outputs are in the root README. Relevant exit codes
+are:
+
+| Code          | Meaning                                                                     |
+| ------------- | --------------------------------------------------------------------------- |
+| `0`           | Success                                                                     |
+| `1`           | Terminal validation, policy, checkpoint, session, or infrastructure failure |
+| `2`           | Declared business outcome                                                   |
+| `3`           | Permission denied                                                           |
+| `4`           | Human intervention required in non-interactive execution                    |
+| `5`           | Human abort                                                                 |
+| `130` / `143` | Graceful `SIGINT` / `SIGTERM` interruption                                  |
+
+`npm run replay:interactive` must run headed. It pauses before policy-marked actions, keeps the same
+browser/context/page alive, and prints a loopback operator URL whose fragment token remains in
+memory and outside logs. Rejected decisions and stale generations cannot resume automation;
+cleanup closes operator and browser resources idempotently.
+
+## Discovery and retained data
+
+Genuine discovery uses the official OpenAI JavaScript SDK and Responses API with strict JSON Schema
+output, `store: false`, no built-in tools, bounded retries, and typed provider errors. Page-derived
+content is explicitly untrusted. The planner can propose only the domain action vocabulary; schema,
+observation binding, policy, and the `SurfaceAdapter` remain authoritative.
+
+The scripted planner exists for deterministic offline regression tests and is not evidence of the
+genuine provider run. The curated genuine traces and replays are indexed in
+[evidence/README.md](../evidence/README.md).
+
+Raw provider payloads, cookies, storage state, authorization headers, operator tokens, and raw
+Playwright trace ZIPs are not retained. Runtime run directories are ignored by default; only the
+manifest-selected sanitized submission evidence is checked in.

@@ -1,0 +1,33 @@
+{
+  "status": "permissionDenied",
+  "runId": "replay-433e5d86-3222-4d75-872e-879decde7e61",
+  "artifactId": "banking.lookup-customer-account",
+  "artifactVersion": "1.0.0",
+  "artifactHash": "a404322cac305d7d0197b85620c1d64c01bcb7b27524f1829ae40e851fac9385",
+  "code": "PERMISSION_DENIED",
+  "stepId": "open-customers",
+  "evidence": [
+    {
+      "evidenceId": "surface-replay-business-outcome.png",
+      "kind": "screenshot",
+      "path": "evidence/runs/replay-433e5d86-3222-4d75-872e-879decde7e61/replay-business-outcome.png",
+      "sanitization": "sanitized",
+      "mediaType": "image/png"
+    },
+    {
+      "evidenceId": "surface-observation.json",
+      "kind": "semanticSnapshot",
+      "path": "evidence/runs/replay-433e5d86-3222-4d75-872e-879decde7e61/observation.json",
+      "sanitization": "sanitized",
+      "mediaType": "application/json"
+    },
+    {
+      "evidenceId": "surface-events.jsonl",
+      "kind": "eventLog",
+      "path": "evidence/runs/replay-433e5d86-3222-4d75-872e-879decde7e61/events.jsonl",
+      "sanitization": "sanitized",
+      "mediaType": "application/x-ndjson"
+    }
+  ],
+  "completedAt": "2026-10-01T02:21:47.274Z"
+}

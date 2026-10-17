@@ -1,0 +1,38 @@
+{
+  "status": "success",
+  "runId": "replay-a9985415-1ce5-40e2-847c-2807012e5a0b",
+  "artifactId": "banking.lookup-customer-account",
+  "artifactVersion": "1.0.0",
+  "artifactHash": "66c28081373c3f64c3f6c8ae7947890c1373902a6e98569c4d78612fc771154e",
+  "outputs": {
+    "accountNumber": "2023",
+    "currentBalance": {
+      "amount": "31444",
+      "currency": "USD"
+    }
+  },
+  "evidence": [
+    {
+      "evidenceId": "surface-replay-final.png",
+      "kind": "screenshot",
+      "path": "evidence/runs/replay-a9985415-1ce5-40e2-847c-2807012e5a0b/replay-final.png",
+      "sanitization": "sanitized",
+      "mediaType": "image/png"
+    },
+    {
+      "evidenceId": "surface-observation.json",
+      "kind": "semanticSnapshot",
+      "path": "evidence/runs/replay-a9985415-1ce5-40e2-847c-2807012e5a0b/observation.json",
+      "sanitization": "sanitized",
+      "mediaType": "application/json"
+    },
+    {
+      "evidenceId": "surface-events.jsonl",
+      "kind": "eventLog",
+      "path": "evidence/runs/replay-a9985415-1ce5-40e2-847c-2807012e5a0b/events.jsonl",
+      "sanitization": "sanitized",
+      "mediaType": "application/x-ndjson"
+    }
+  ],
+  "completedAt": "2026-10-01T02:18:10.103Z"
+}

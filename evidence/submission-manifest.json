@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifact": {
+    "id": "banking.lookup-customer-account.genuine-compiled",
+    "version": "1.0.2",
+    "path": "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json",
+    "canonicalHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095"
+  },
+  "groups": [
+    {
+      "id": "provider-preflight",
+      "behavior": "Outbound genuine-provider input was sanitized before discovery.",
+      "expected": "preflightPassed",
+      "files": ["evidence/genuine-provider/preflight-summary.json"]
+    },
+    {
+      "id": "genuine-discovery-success",
+      "behavior": "Genuine OpenAI discovery completed with typed account outputs.",
+      "runId": "discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b",
+      "traceHash": "f92e3570a152091678c9f5c95fef593e5edb736266e176fe544e82908a972205",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "expected": "success",
+      "files": [
+        "evidence/runs/discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b/discovery-events.jsonl",
+        "evidence/runs/discovery-bfeadefa-54c9-4bea-93c5-a71b50e12d0b/result.json"
+      ]
+    },
+    {
+      "id": "genuine-discovery-not-found",
+      "behavior": "Genuine OpenAI discovery recognized the declared missing-customer outcome.",
+      "runId": "discovery-ef14b0a1-b648-4e60-8015-f789c102006e",
+      "traceHash": "44a7304d8ec8fc8b8e19a5cf1e785f596556ad9344cd39061ae329a6bb4af3c4",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "expected": "CUSTOMER_NOT_FOUND",
+      "files": [
+        "evidence/runs/discovery-ef14b0a1-b648-4e60-8015-f789c102006e/discovery-events.jsonl",
+        "evidence/runs/discovery-ef14b0a1-b648-4e60-8015-f789c102006e/result.json"
+      ]
+    },
+    {
+      "id": "compiled-capability",
+      "behavior": "The genuine trace was compiled, reviewed by exact hash, and verified in fresh sessions.",
+      "expected": "promotionEligible",
+      "files": [
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json",
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.compilation.json",
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.review-packet.md",
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.review.json",
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.verification.json",
+        "artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.step11-verification.json"
+      ]
+    },
+    {
+      "id": "model-free-replay-success",
+      "behavior": "The approved artifact replayed without a model and dynamically extracted typed outputs.",
+      "runId": "replay-82901137-8bfa-4b05-8572-d98e017b4536",
+      "expected": "success: accountNumber=2023; currentBalance=31444 USD",
+      "files": [
+        "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/events.jsonl",
+        "evidence/runs/replay-82901137-8bfa-4b05-8572-d98e017b4536/result.json"
+      ]
+    },
+    {
+      "id": "model-free-replay-not-found",
+      "behavior": "The approved artifact classified a missing customer as a declared business outcome.",
+      "runId": "replay-96576566-7d42-494f-8223-10486f78884b",
+      "expected": "businessOutcome:CUSTOMER_NOT_FOUND",
+      "files": [
+        "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/events.jsonl",
+        "evidence/runs/replay-96576566-7d42-494f-8223-10486f78884b/result.json"
+      ]
+    },
+    {
+      "id": "policy-denial",
+      "behavior": "Fail-closed policy rejected navigation outside its origin/route allowlist.",
+      "runId": "replay-5a0d56c0-1b01-4bcd-bd5a-ba7ddb8ffbe1",
+      "expected": "failure:POLICY_DENIED",
+      "files": [
+        "evidence/runs/replay-5a0d56c0-1b01-4bcd-bd5a-ba7ddb8ffbe1/events.jsonl",
+        "evidence/runs/replay-5a0d56c0-1b01-4bcd-bd5a-ba7ddb8ffbe1/result.json"
+      ]
+    },
+    {
+      "id": "permission-denial",
+      "behavior": "A rendered staff-access denial became the declared PERMISSION_DENIED outcome.",
+      "runId": "replay-433e5d86-3222-4d75-872e-879decde7e61",
+      "expected": "permissionDenied:PERMISSION_DENIED",
+      "files": [
+        "evidence/runs/replay-433e5d86-3222-4d75-872e-879decde7e61/events.jsonl",
+        "evidence/runs/replay-433e5d86-3222-4d75-872e-879decde7e61/result.json"
+      ]
+    },
+    {
+      "id": "authentication-recovery",
+      "behavior": "One bounded reauthentication recovered the session and resumed only the interrupted safe step.",
+      "runId": "replay-3f8a160f-4d7b-48d3-8e44-5524772c93aa",
+      "expected": "success:RECOVERED_OUTPUT",
+      "files": [
+        "evidence/submission/authentication-recovery/artifact.json",
+        "evidence/submission/authentication-recovery/policy.json",
+        "evidence/submission/authentication-recovery/runs/replay-3f8a160f-4d7b-48d3-8e44-5524772c93aa/events.jsonl",
+        "evidence/submission/authentication-recovery/runs/replay-3f8a160f-4d7b-48d3-8e44-5524772c93aa/observation.json",
+        "evidence/submission/authentication-recovery/runs/replay-3f8a160f-4d7b-48d3-8e44-5524772c93aa/replay-final.png",
+        "evidence/submission/authentication-recovery/runs/replay-3f8a160f-4d7b-48d3-8e44-5524772c93aa/result.json"
+      ]
+    },
+    {
+      "id": "authentication-second-expiration",
+      "behavior": "A second expiration after the one allowed recovery failed terminally.",
+      "runId": "replay-52e384d4-f0ce-4634-8448-48832e80b03b",
+      "expected": "failure:SESSION_EXPIRED",
+      "files": [
+        "evidence/submission/authentication-second-expiration/artifact.json",
+        "evidence/submission/authentication-second-expiration/policy.json",
+        "evidence/submission/authentication-second-expiration/runs/replay-52e384d4-f0ce-4634-8448-48832e80b03b/events.jsonl",
+        "evidence/submission/authentication-second-expiration/runs/replay-52e384d4-f0ce-4634-8448-48832e80b03b/replay-failure.png",
+        "evidence/submission/authentication-second-expiration/runs/replay-52e384d4-f0ce-4634-8448-48832e80b03b/result.json"
+      ]
+    },
+    {
+      "id": "human-takeover-resume",
+      "behavior": "Automation paused safely, a human claimed the same session, Resume was validated, and automation continued.",
+      "runId": "replay-a9985415-1ce5-40e2-847c-2807012e5a0b",
+      "expected": "success after human Resume",
+      "files": [
+        "evidence/runs/replay-a9985415-1ce5-40e2-847c-2807012e5a0b/events.jsonl",
+        "evidence/runs/replay-a9985415-1ce5-40e2-847c-2807012e5a0b/result.json"
+      ]
+    },
+    {
+      "id": "human-abort",
+      "behavior": "A human deliberately aborted while automation remained paused at the intervention boundary.",
+      "runId": "replay-cd1a62b0-4175-48ca-b850-cd2347946196",
+      "expected": "aborted:ABORTED_BY_HUMAN",
+      "files": [
+        "evidence/runs/replay-cd1a62b0-4175-48ca-b850-cd2347946196/events.jsonl",
+        "evidence/runs/replay-cd1a62b0-4175-48ca-b850-cd2347946196/result.json"
+      ]
+    }
+  ]
+}
