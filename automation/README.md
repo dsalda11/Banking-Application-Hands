@@ -24,8 +24,9 @@ Configuration is read from the process environment. No `.env` or `.env.example` 
 - `DISCOVERY_SEND_SCREENSHOTS`: permits sanitized discovery screenshots only when both runtime and
   goal policy allow them.
 
-`npm run doctor` reports readiness and configuration-presence booleans without printing secret
-values. Replay itself needs no provider variable.
+`npm run doctor` checks deterministic-replay readiness and does not require a provider variable.
+`npm run doctor -- --mode discovery` additionally requires genuine-discovery provider configuration.
+Both report only configuration-presence booleans, never secret values.
 
 ## Development commands
 
@@ -63,6 +64,7 @@ security, or evidence checks listed above.
 - `src/intervention/`: exclusive leases, generation fencing, loopback operator server, and
   Resume/Complete/Abort/Reclaim coordination.
 - `src/evidence/` and `src/logging/`: sanitized structured evidence and metadata-only redaction.
+- `src/tenant/`: pure validation and deterministic hashing for narrow tenant UI configurations.
 
 The replay engine accepts only declared inputs and secret references, checks target fingerprints,
 resolves locator candidates in order, rejects zero or ambiguous `exactlyOne` matches, enforces
@@ -145,3 +147,22 @@ genuine provider run. The curated genuine traces and replays are indexed in
 Raw provider payloads, cookies, storage state, authorization headers, operator tokens, and raw
 Playwright trace ZIPs are not retained. Runtime run directories are ignored by default; only the
 manifest-selected sanitized submission evidence is checked in.
+
+## Cross-tenant foundation
+
+[`../tenants/tenant-a.json`](../tenants/tenant-a.json) and
+[`../tenants/tenant-b.json`](../tenants/tenant-b.json) reference the same exact approved capability
+hash while describing vendor versions `1.0.0` and `1.1.0`. The strict tenant schema permits only
+entry fingerprints, step targets, URL checkpoints, known-outcome text, and runtime environment
+variable references. Unknown fields, policy/action/output/risk changes, embedded credentials,
+incompatible vendor versions, and base-hash mismatches fail closed.
+
+With the Compose application running, the real Tenant B UI can be checked independently of replay:
+
+```bash
+BROWSER_HEADLESS=true npm run surface:tenant-b -- --customer-username customer
+```
+
+This opens two fresh Chromium contexts to verify a successful account lookup/details view and a
+missing-customer result. Its structured sanitized record is written under ignored
+`evidence/local/`. Step 1 intentionally does not apply tenant overrides to `ReplayEngine`.

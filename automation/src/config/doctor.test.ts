@@ -10,14 +10,22 @@ const readyReport: DoctorReadiness = {
 };
 
 describe('doctor readiness', () => {
-  it('passes only when genuine discovery prerequisites are present', () => {
+  it('passes replay readiness without provider credentials', () => {
+    expect(isDoctorReady({ ...readyReport, openAiConfigured: false })).toBe(true);
+  });
+
+  it('passes when genuine discovery prerequisites are present', () => {
     expect(isDoctorReady(readyReport)).toBe(true);
+  });
+
+  it('requires provider credentials in discovery mode', () => {
+    expect(isDoctorReady({ ...readyReport, openAiConfigured: false }, 'discovery')).toBe(false);
+    expect(isDoctorReady(readyReport, 'discovery')).toBe(true);
   });
 
   it.each([
     ['Node 24', { node24InUse: false }],
     ['a writable directory', { directories: { artifacts: true, policies: false, evidence: true } }],
-    ['provider credentials', { openAiConfigured: false }],
     ['bank credentials', { bankCredentialsConfigured: false }],
   ] satisfies ReadonlyArray<readonly [string, Partial<DoctorReadiness>]>)(
     'fails when %s is missing',

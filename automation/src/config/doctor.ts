@@ -5,11 +5,13 @@ export interface DoctorReadiness {
   readonly bankCredentialsConfigured: boolean;
 }
 
-export function isDoctorReady(report: DoctorReadiness): boolean {
+export type DoctorMode = 'replay' | 'discovery';
+
+export function isDoctorReady(report: DoctorReadiness, mode: DoctorMode = 'replay'): boolean {
   return (
     report.node24InUse &&
     Object.values(report.directories).every(Boolean) &&
-    report.openAiConfigured &&
+    (mode === 'replay' || report.openAiConfigured) &&
     report.bankCredentialsConfigured
   );
 }

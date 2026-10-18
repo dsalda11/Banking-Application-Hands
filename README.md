@@ -39,6 +39,12 @@ states distinct. Evidence writers retain structured, sanitized events instead of
 provider payloads. See [REPORT.md](REPORT.md) for the design trade-offs and
 [ARCHITECTURE_DECISIONS.md](ARCHITECTURE_DECISIONS.md) for the concise implementation record.
 
+The local target also includes a second same-vendor UI configuration at `/tenant-b/login`. It reuses
+the original services and data while changing routes, labels, headings, and account-table layout.
+Strict non-secret configurations in [`tenants/`](tenants/) bind both variants to the same approved
+base capability hash. The current cross-tenant foundation validates and deterministically hashes
+those narrow differences; applying them during replay is intentionally reserved for the next step.
+
 ## Prerequisites
 
 - Node.js 24 and npm (the automation package rejects other Node majors)
@@ -49,14 +55,14 @@ provider payloads. See [REPORT.md](REPORT.md) for the design trade-offs and
 
 Runtime-only variables:
 
-| Variable | Purpose | Required |
-| --- | --- | --- |
-| `BANK_STAFF_USERNAME` | Local synthetic staff login | Replay and discovery |
-| `BANK_STAFF_PASSWORD` | Local synthetic staff login | Replay and discovery |
-| `OPENAI_API_KEY` | Reviewer's own OpenAI credential | Genuine discovery only |
-| `OPENAI_MODEL` | Provider model name; code has a safe configuration default | Genuine discovery only |
-| `BANK_APP_BASE_URL` | Banking UI origin; defaults to `http://127.0.0.1:8080` | No |
-| `BROWSER_HEADLESS` | `true` for unattended runs; defaults to `false` | No |
+| Variable              | Purpose                                                    | Required               |
+| --------------------- | ---------------------------------------------------------- | ---------------------- |
+| `BANK_STAFF_USERNAME` | Local synthetic staff login                                | Replay and discovery   |
+| `BANK_STAFF_PASSWORD` | Local synthetic staff login                                | Replay and discovery   |
+| `OPENAI_API_KEY`      | Reviewer's own OpenAI credential                           | Genuine discovery only |
+| `OPENAI_MODEL`        | Provider model name; code has a safe configuration default | Genuine discovery only |
+| `BANK_APP_BASE_URL`   | Banking UI origin; defaults to `http://127.0.0.1:8080`     | No                     |
+| `BROWSER_HEADLESS`    | `true` for unattended runs; defaults to `false`            | No                     |
 
 `BANK_NON_STAFF_USERNAME`, `BANK_NON_STAFF_PASSWORD`, and `BANK_CUSTOMER_USERNAME` support focused
 proof commands but are not needed for the two reviewer paths below. Docker Compose also accepts
@@ -82,8 +88,9 @@ Wait until both `db` and `app` report healthy. The application is then available
 published to the host. For a host-port conflict, prefix the startup command with `APP_PORT=8081` and
 set `BANK_APP_BASE_URL` to the matching URL for automation runs.
 
-The local synthetic staff credential must be supplied to the automation process at runtime. Do not
-store it in the repository. To verify the source outside Docker:
+Compose seeds the local-only synthetic staff fixture `admin` / `admin`. Supply it to the automation
+process at runtime as shown below; it is test data, not an author-owned or production credential.
+Do not store real credentials in the repository. To verify the source outside Docker:
 
 ```bash
 ./mvnw test
@@ -103,8 +110,8 @@ After starting Compose, validate the exact checked-in artifact and run the succe
 
 ```bash
 cd automation
-export BANK_STAFF_USERNAME="<local-demo-staff-username>"
-export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+export BANK_STAFF_USERNAME="admin"
+export BANK_STAFF_PASSWORD="admin"
 
 npm run artifact:validate -- \
   --artifact ../artifacts/drafts/banking.lookup-customer-account.genuine-compiled.1.0.2.json
@@ -145,8 +152,8 @@ and model configuration at runtime:
 
 ```bash
 cd automation
-export BANK_STAFF_USERNAME="<local-demo-staff-username>"
-export BANK_STAFF_PASSWORD="<local-demo-staff-password>"
+export BANK_STAFF_USERNAME="admin"
+export BANK_STAFF_PASSWORD="admin"
 export OPENAI_API_KEY="<your-own-key>"
 export OPENAI_MODEL="<supported-model>"
 
@@ -197,10 +204,10 @@ npm run security:dependencies
 npm run evidence:check
 ```
 
-`doctor` validates Node 24, writable repository paths, and the presence of banking/provider runtime
-configuration without printing values. It is expected to fail when required genuine-discovery
-configuration is absent. Run the Java checks from the repository root with `./mvnw test` and
-`./mvnw package`.
+`doctor` defaults to replay readiness: it validates Node 24, writable repository paths, and banking
+runtime configuration without requiring an LLM credential or printing secret values. Use
+`npm run doctor -- --mode discovery` to additionally require provider configuration before genuine
+discovery. Run the Java checks from the repository root with `./mvnw test` and `./mvnw package`.
 
 ## Security notes
 

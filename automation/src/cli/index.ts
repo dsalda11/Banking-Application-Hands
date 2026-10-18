@@ -9,8 +9,10 @@ import path from 'node:path';
 import { Command } from 'commander';
 
 import { loadEnvironment } from '../config/env.js';
-import { isDoctorReady } from '../config/doctor.js';
+import { isDoctorReady, type DoctorMode } from '../config/doctor.js';
+import { preparePermissionDeniedProof } from './permission-denied-proof.js';
 import { runBankingSurfaceSmoke } from '../smoke/banking-surface-smoke.js';
+import { runTenantVariantSmoke } from '../smoke/tenant-variant-smoke.js';
 import { loadArtifact } from '../replay/artifact-loader.js';
 import { ArtifactRegistry } from '../replay/artifact-registry.js';
 import { ReplayEngine } from '../replay/replay-engine.js';
@@ -34,6 +36,17 @@ import {
   storeDraft,
   verifyArtifact,
 } from '../compiler/artifact-lifecycle.js';
+import {
+  createTenantExecutionPlan,
+  loadTenantConfigurationById,
+  type TenantCompatibility,
+} from '../tenant/index.js';
+
+const localBankTenantCompatibility: TenantCompatibility = {
+  vendorFamily: 'abc-legacy-banking',
+  product: 'web-127.0.0.1',
+  supportedApplicationVersions: ['1.0.0', '1.1.0'],
+};
 
 async function directoryWritable(directory: string): Promise<boolean> {
   try {
@@ -44,8 +57,12 @@ async function directoryWritable(directory: string): Promise<boolean> {
   }
 }
 
-async function runDoctor(): Promise<void> {
+async function runDoctor(options: { mode: string }): Promise<void> {
   try {
+    if (options.mode !== 'replay' && options.mode !== 'discovery') {
+      throw new Error('Doctor mode must be either replay or discovery');
+    }
+    const mode: DoctorMode = options.mode;
     const environment = loadEnvironment();
     const directories = {
       artifacts: await directoryWritable(environment.paths.artifactsDirectory),
@@ -54,6 +71,8 @@ async function runDoctor(): Promise<void> {
     };
     const node24InUse = process.versions.node.startsWith('24.');
     const report = {
+      mode,
+      providerRequired: mode === 'discovery',
       node: process.versions.node,
       node24InUse,
       directories,
@@ -68,7 +87,7 @@ async function runDoctor(): Promise<void> {
       operator: `${environment.operatorHost}:${environment.operatorPort}`,
     };
     console.log(JSON.stringify(report, null, 2));
-    if (!isDoctorReady(report)) {
+    if (!isDoctorReady(report, mode)) {
       process.exitCode = 1;
     }
   } catch (error: unknown) {
@@ -79,7 +98,11 @@ async function runDoctor(): Promise<void> {
 
 const program = new Command();
 program.name('llm-hands-automation').description('Host-side automation engine scaffold');
-program.command('doctor').description('Check local scaffold configuration').action(runDoctor);
+program
+  .command('doctor')
+  .description('Check local configuration for deterministic replay or genuine discovery')
+  .option('--mode <mode>', 'readiness mode: replay or discovery', 'replay')
+  .action(runDoctor);
 
 program
   .command('trace:validate')
@@ -272,6 +295,14 @@ async function runSurfaceSmokeCommand(options: { customerUsername?: string }): P
   if (result.status === 'failure') process.exitCode = 1;
 }
 
+async function runTenantVariantSmokeCommand(options: { customerUsername?: string }): Promise<void> {
+  const environment = loadEnvironment({ requireBankCredentials: true });
+  const customerUsername = options.customerUsername ?? environment.bankCustomerUsername;
+  if (!customerUsername)
+    throw new Error('BANK_CUSTOMER_USERNAME or --customer-username is required');
+  console.log(JSON.stringify(await runTenantVariantSmoke(customerUsername, environment)));
+}
+
 function collectInput(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
@@ -305,11 +336,13 @@ async function runArtifactReplay(options: {
   inputFile?: string;
   credentialProfile?: 'staff' | 'nonStaff';
   interactive?: boolean;
+  tenant?: string;
+  allowTestTenantConfiguration?: boolean;
 }): Promise<void> {
   const credentialProfile = options.credentialProfile ?? 'staff';
   const environment = loadEnvironment({
-    requireBankCredentials: credentialProfile === 'staff',
-    requireNonStaffCredentials: credentialProfile === 'nonStaff',
+    requireBankCredentials: !options.tenant && credentialProfile === 'staff',
+    requireNonStaffCredentials: !options.tenant && credentialProfile === 'nonStaff',
   });
   const loaded = await loadArtifact(path.resolve(options.artifact));
   const loadedPolicy = await loadPolicy(
@@ -319,16 +352,51 @@ async function runArtifactReplay(options: {
     ),
   );
   const secrets: Record<string, string> = {};
-  for (const name of loaded.artifact.contract.requiredSecrets) {
-    const value =
-      credentialProfile === 'nonStaff'
-        ? name === 'BANK_STAFF_USERNAME'
-          ? environment.bankNonStaffUsername
-          : name === 'BANK_STAFF_PASSWORD'
-            ? environment.bankNonStaffPassword
-            : undefined
-        : process.env[name];
-    if (value !== undefined) secrets[name] = value;
+  let baseUrl = environment.bankAppBaseUrl;
+  let tenantExecutionPlan;
+  if (options.tenant) {
+    if (credentialProfile !== 'staff')
+      throw new Error('Tenant-specialized replay supports the staff credential profile only');
+    const resolvedTenant = await loadTenantConfigurationById(
+      path.join(environment.paths.repositoryRoot, 'tenants'),
+      options.tenant,
+      loaded,
+      localBankTenantCompatibility,
+    );
+    if (!options.allowTestTenantConfiguration)
+      throw new Error(
+        'Tenant configuration is a controlled local test fixture; pass --allow-test-tenant-configuration to execute it',
+      );
+    const configuredBaseUrl = process.env[resolvedTenant.runtime.baseUrlReference];
+    if (!configuredBaseUrl)
+      throw new Error(
+        `Missing required environment variable: ${resolvedTenant.runtime.baseUrlReference}`,
+      );
+    const parsedBaseUrl = new URL(configuredBaseUrl);
+    const entryPoint = resolvedTenant.target.entryPoint;
+    if (entryPoint.kind === 'absoluteUrl' && new URL(entryPoint.url).origin !== parsedBaseUrl.origin)
+      throw new Error('Tenant runtime base URL does not match the validated target origin');
+    baseUrl = parsedBaseUrl.origin;
+    for (const name of loaded.artifact.contract.requiredSecrets) {
+      const reference = resolvedTenant.runtime.secretBindings[name];
+      const value = reference ? process.env[reference] : undefined;
+      if (!reference || !value)
+        throw new Error(`Missing required tenant runtime secret reference for ${name}`);
+      secrets[name] = value;
+    }
+    tenantExecutionPlan = createTenantExecutionPlan(loaded, resolvedTenant);
+  } else {
+    for (const name of loaded.artifact.contract.requiredSecrets) {
+      const value =
+        credentialProfile === 'nonStaff'
+          ? name === 'BANK_STAFF_USERNAME'
+            ? environment.bankNonStaffUsername
+            : name === 'BANK_STAFF_PASSWORD'
+              ? environment.bankNonStaffPassword
+              : undefined
+          : process.env[name];
+      if (value !== undefined) secrets[name] = value;
+    }
   }
   if (options.interactive && environment.browserHeadless)
     throw new Error('Interactive replay requires BROWSER_HEADLESS=false');
@@ -336,11 +404,12 @@ async function runArtifactReplay(options: {
     loadedArtifact: loaded,
     inputs: parseInputs(options.input, options.inputFile),
     secrets,
-    baseUrl: environment.bankAppBaseUrl,
+    baseUrl,
     evidenceDirectory: environment.paths.evidenceDirectory,
     headless: options.interactive ? false : environment.browserHeadless,
     adapter: new PlaywrightWebAdapter(),
     loadedPolicy,
+    ...(tenantExecutionPlan ? { tenantExecutionPlan } : {}),
     logger: createLogger({ level: environment.logLevel }),
   } as const;
   const result = options.interactive
@@ -367,7 +436,24 @@ async function runArtifactReplay(options: {
         ...replayOptions,
         executionMode: 'nonInteractive',
       });
-  console.log(JSON.stringify({ ...result, artifactHash: loaded.contentHash }));
+  console.log(
+    JSON.stringify({
+      ...result,
+      artifactHash: loaded.contentHash,
+      ...(tenantExecutionPlan
+        ? {
+            tenant: {
+              id: tenantExecutionPlan.tenantId,
+              configurationHash: tenantExecutionPlan.tenantConfigurationHash,
+              effectiveConfigurationHash: tenantExecutionPlan.effectiveConfigurationHash,
+              effectivePlanHash: tenantExecutionPlan.effectivePlanHash,
+              activation: tenantExecutionPlan.activation,
+              modelCalls: 0,
+            },
+          }
+        : {}),
+    }),
+  );
   if (result.status === 'failure') process.exitCode = 1;
   if (result.status === 'businessOutcome') process.exitCode = 2;
   if (result.status === 'permissionDenied') process.exitCode = 3;
@@ -406,34 +492,18 @@ async function runPermissionDeniedProof(options: {
   customerUsername: string;
 }): Promise<void> {
   const raw = JSON.parse(readFileSync(path.resolve(options.artifact), 'utf8')) as {
+    contract: { businessOutcomes: Array<Record<string, unknown>> };
     steps: Array<{
       id: string;
       action: Record<string, unknown>;
       checkpoint: Record<string, unknown>;
     }>;
   };
-  const submitLogin = raw.steps.find((step) => step.id === 'submit-login');
-  const openCustomers = raw.steps.find((step) => step.id === 'open-customers');
-  if (!submitLogin || !openCustomers)
-    throw new Error('Permission-denied fixture requires login and staff-navigation steps');
-  submitLogin.checkpoint = {
-    kind: 'textPresent',
-    description: 'Non-staff authentication reaches the customer console.',
-    text: 'Transfer Money',
-  };
-  openCustomers.action = {
-    kind: 'navigate',
-    destination: { kind: 'relativeRoute', route: '/showcust' },
-  };
-  openCustomers.checkpoint = {
-    kind: 'textPresent',
-    description: 'The protected staff route reports access denial.',
-    text: 'Error Occured!! GO back and try again.',
-  };
+  const prepared = preparePermissionDeniedProof(raw);
   const directory = await mkdtemp(path.join(os.tmpdir(), 'permission-denial-artifact-'));
   const artifactPath = path.join(directory, 'permission-denial.json');
   try {
-    await writeFile(artifactPath, JSON.stringify(raw), 'utf8');
+    await writeFile(artifactPath, JSON.stringify(prepared), 'utf8');
     await runArtifactReplay({
       artifact: artifactPath,
       input: [`customerUsername=${options.customerUsername}`],
@@ -519,6 +589,12 @@ program
   .action(runSurfaceSmokeCommand);
 
 program
+  .command('tenant-variant-smoke')
+  .description('Verify the Tenant B browser workflow and missing-customer behavior')
+  .option('--customer-username <username>', 'Customer username to locate')
+  .action(runTenantVariantSmokeCommand);
+
+program
   .command('artifact:list')
   .description('List validated artifacts in the filesystem registry')
   .action(async () => {
@@ -552,6 +628,11 @@ program
   .option('--policy <path>', 'Path to the replay policy JSON')
   .option('--input <name=value>', 'Declared non-secret input', collectInput, [])
   .option('--input-file <path>', 'JSON object containing declared non-secret inputs')
+  .option('--tenant <tenant-id>', 'Validated local tenant configuration identity')
+  .option(
+    '--allow-test-tenant-configuration',
+    'Explicitly allow a non-production local tenant fixture',
+  )
   .action(runArtifactReplay);
 program
   .command('replay:interactive')
@@ -560,6 +641,11 @@ program
   .requiredOption('--policy <path>', 'Path to the replay policy JSON')
   .option('--input <name=value>', 'Declared non-secret input', collectInput, [])
   .option('--input-file <path>', 'JSON object containing declared non-secret inputs')
+  .option('--tenant <tenant-id>', 'Validated local tenant configuration identity')
+  .option(
+    '--allow-test-tenant-configuration',
+    'Explicitly allow a non-production local tenant fixture',
+  )
   .action((options) => runArtifactReplay({ ...options, interactive: true }));
 program
   .command('proof:permission-denied')
