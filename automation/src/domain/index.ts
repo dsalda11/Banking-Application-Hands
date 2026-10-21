@@ -12,5 +12,6 @@ export * from './outcomes.js';
 export * from './primitives.js';
 export * from './run-result.js';
 export * from './semantic-validation.js';
+export * from './tenant-configuration.js';
 export * from './values.js';
 export * from './policy.js';

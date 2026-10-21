@@ -10,6 +10,7 @@ import { DiscoveryEvent } from './events.js';
 import { InterventionRequest } from './intervention.js';
 import { RunResult } from './run-result.js';
 import { ReplayPolicy } from './policy.js';
+import { TenantConfiguration } from './tenant-configuration.js';
 
 const schemaDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../schemas');
 const definitions: readonly (readonly [string, z.ZodTypeAny])[] = [
@@ -20,6 +21,7 @@ const definitions: readonly (readonly [string, z.ZodTypeAny])[] = [
   ['intervention-request', InterventionRequest],
   ['run-result', RunResult],
   ['replay-policy', ReplayPolicy],
+  ['tenant-configuration', TenantConfiguration],
 ];
 
 type JsonSchemaDocument = Record<string, unknown>;
@@ -150,7 +152,8 @@ async function schemaFor(name: string, schema: z.ZodTypeAny): Promise<string> {
     name === 'intervention-request' ||
     name === 'run-result' ||
     name === 'replay-policy' ||
-    name === 'discovery-goal'
+    name === 'discovery-goal' ||
+    name === 'tenant-configuration'
       ? toJsonSchema(schema, { target: 'draft-2020-12', io: 'input', cycles: 'ref', reused: 'ref' })
       : reviewSchema(name, schema);
   return prettier.format(JSON.stringify(document), { parser: 'json', printWidth: 100 });

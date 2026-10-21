@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "activation": "testFixture",
+  "tenantId": "tenant-a",
+  "vendor": {
+    "family": "abc-legacy-banking",
+    "product": "web-127.0.0.1",
+    "applicationVersion": "1.0.0",
+    "variant": "classic"
+  },
+  "baseCapability": {
+    "id": "banking.lookup-customer-account.genuine-compiled",
+    "version": "1.0.2",
+    "canonicalHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095"
+  },
+  "target": {
+    "entryPoint": {
+      "kind": "absoluteUrl",
+      "url": "http://127.0.0.1:8080/index"
+    },
+    "fingerprints": [
+      {
+        "kind": "urlPathPattern",
+        "id": "tenant-a-login-route",
+        "pattern": "^/index$"
+      },
+      {
+        "kind": "requiredText",
+        "id": "tenant-a-login-heading",
+        "text": "- Welcome Guest -"
+      },
+      {
+        "kind": "requiredText",
+        "id": "tenant-a-login-form",
+        "text": "Login :-"
+      }
+    ]
+  },
+  "runtime": {
+    "baseUrlReference": "TENANT_A_BASE_URL",
+    "secretBindings": {
+      "BANK_STAFF_USERNAME": "TENANT_A_STAFF_USERNAME",
+      "BANK_STAFF_PASSWORD": "TENANT_A_STAFF_PASSWORD"
+    }
+  },
+  "overrides": []
+}

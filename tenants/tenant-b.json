@@ -1,0 +1,294 @@
+{
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "activation": "testFixture",
+  "tenantId": "tenant-b",
+  "vendor": {
+    "family": "abc-legacy-banking",
+    "product": "web-127.0.0.1",
+    "applicationVersion": "1.1.0",
+    "variant": "harbor-community"
+  },
+  "baseCapability": {
+    "id": "banking.lookup-customer-account.genuine-compiled",
+    "version": "1.0.2",
+    "canonicalHash": "1873dc5b25977f6de3ec522751179c45359df9c50cdf4841e3bf6a08be191095"
+  },
+  "target": {
+    "entryPoint": {
+      "kind": "absoluteUrl",
+      "url": "http://127.0.0.1:8080/tenant-b/login"
+    },
+    "fingerprints": [
+      {
+        "kind": "urlPathPattern",
+        "id": "tenant-b-login-route",
+        "pattern": "^/tenant-b/login$"
+      },
+      {
+        "kind": "requiredText",
+        "id": "tenant-b-brand",
+        "text": "Harbor Community Bank"
+      },
+      {
+        "kind": "requiredText",
+        "id": "tenant-b-login-heading",
+        "text": "Operations Sign In"
+      }
+    ]
+  },
+  "runtime": {
+    "baseUrlReference": "TENANT_B_BASE_URL",
+    "secretBindings": {
+      "BANK_STAFF_USERNAME": "TENANT_B_STAFF_USERNAME",
+      "BANK_STAFF_PASSWORD": "TENANT_B_STAFF_PASSWORD"
+    }
+  },
+  "overrides": [
+    {
+      "kind": "urlCheckpoint",
+      "stepId": "step-001-navigate",
+      "pattern": "^/tenant-b/login$"
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-002-enter-text",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B operator ID field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Operator ID" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "username" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-002-enter-text",
+      "surface": "checkpoint",
+      "target": {
+        "description": "Tenant B operator ID field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Operator ID" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "username" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-003-enter-text",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B passcode field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Passcode" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "password" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-003-enter-text",
+      "surface": "checkpoint",
+      "target": {
+        "description": "Tenant B passcode field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Passcode" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "password" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-004-activate",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B sign-in button",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": { "kind": "literal", "value": "Sign In" },
+            "exact": true
+          }
+        ]
+      }
+    },
+    {
+      "kind": "urlCheckpoint",
+      "stepId": "step-004-activate",
+      "pattern": "^/tenant-b/operations$"
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-005-activate",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B client directory link",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "link",
+            "name": { "kind": "literal", "value": "Client Directory" },
+            "exact": true
+          },
+          {
+            "strategy": "text",
+            "text": { "kind": "literal", "value": "Client Directory" },
+            "exact": true
+          }
+        ]
+      }
+    },
+    {
+      "kind": "urlCheckpoint",
+      "stepId": "step-005-activate",
+      "pattern": "^/tenant-b/clients$"
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-006-enter-text",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B client-login search field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Search client login:" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "username" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-006-enter-text",
+      "surface": "checkpoint",
+      "target": {
+        "description": "Tenant B client-login search field",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "textbox",
+            "name": { "kind": "literal", "value": "Search client login:" },
+            "exact": true
+          },
+          {
+            "strategy": "attribute",
+            "name": "name",
+            "value": { "kind": "literal", "value": "username" }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-007-activate",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B client search button",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "role",
+            "role": "button",
+            "name": { "kind": "literal", "value": "Find Client" },
+            "exact": true
+          }
+        ]
+      }
+    },
+    {
+      "kind": "urlCheckpoint",
+      "stepId": "step-007-activate",
+      "pattern": "^/tenant-b/clients$"
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-008-extract",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B account-number cell",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "tableCell",
+            "header": { "kind": "literal", "value": "Account Number" },
+            "columnIndex": 3
+          }
+        ]
+      }
+    },
+    {
+      "kind": "stepTarget",
+      "stepId": "step-009-extract",
+      "surface": "action",
+      "target": {
+        "description": "Tenant B balance cell",
+        "match": "exactlyOne",
+        "candidates": [
+          {
+            "strategy": "tableCell",
+            "header": { "kind": "literal", "value": "Account Balance" },
+            "columnIndex": 2
+          }
+        ]
+      }
+    },
+    {
+      "kind": "businessOutcomeText",
+      "outcomeCode": "CUSTOMER_NOT_FOUND",
+      "text": "No client matched the supplied login."
+    }
+  ]
+}

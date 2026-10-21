@@ -10,7 +10,7 @@ import { BusinessOutcome } from './outcomes.js';
 const InputSpec = z.strictObject({ description: NonEmptyString.max(256), shape: DataShape });
 const OutputSpec = z.strictObject({ description: NonEmptyString.max(256), shape: DataShape });
 
-const EntryPoint = z.discriminatedUnion('kind', [
+export const EntryPoint = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('relativeRoute'),
     route: z.string().regex(/^\/[A-Za-z0-9_./?=&-]{0,255}$/),
@@ -18,7 +18,7 @@ const EntryPoint = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('absoluteUrl'), url: z.string().url() }),
 ]);
 
-const Fingerprint = z.discriminatedUnion('kind', [
+export const Fingerprint = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('urlPathPattern'),
     id: Identifier,
@@ -94,3 +94,5 @@ export const CapabilityArtifact = z.strictObject({
 export type CapabilityArtifactType = z.infer<typeof CapabilityArtifact>;
 export type InputSpecType = z.infer<typeof InputSpec>;
 export type OutputSpecType = z.infer<typeof OutputSpec>;
+export type EntryPointType = z.infer<typeof EntryPoint>;
+export type FingerprintType = z.infer<typeof Fingerprint>;
