@@ -88,6 +88,8 @@ export class PlaywrightWebAdapter implements SurfaceAdapter {
       const pendingError = this.session.takePendingError();
       if (pendingError) throw pendingError;
       const result = await work();
+      const actionError = this.session.takePendingError();
+      if (actionError) throw actionError;
       return {
         ok: true,
         action: action.kind,

@@ -273,6 +273,33 @@ describe('Playwright surface fixture', () => {
     expect(result.ok).toBe(true);
     expect(result.target).toMatchObject({ strategy: 'accessibility', candidateIndex: 1 });
   });
+  it('dismisses an unexpected dialog and fails the action that opened it', async () => {
+    await adapter.session.page!.setContent(
+      '<button onclick="alert(\'unexpected interstitial\')">Continue</button>',
+    );
+    const result = await adapter.execute(
+      {
+        kind: 'activate',
+        target: {
+          description: 'dialog-opening control',
+          candidates: [
+            {
+              strategy: 'role',
+              role: 'button',
+              name: { kind: 'literal', value: 'Continue' },
+            },
+          ],
+          match: 'exactlyOne',
+        },
+      },
+      context,
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'UNEXPECTED_DIALOG', retryable: false },
+    });
+  });
   it('bounds waits by the declared action timeout', async () => {
     await adapter.session.page!.setContent('<main>Never ready</main>');
     const started = Date.now();
