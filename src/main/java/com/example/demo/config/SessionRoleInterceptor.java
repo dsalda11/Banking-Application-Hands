@@ -13,19 +13,22 @@ public class SessionRoleInterceptor implements HandlerInterceptor {
 			throws Exception {
 		String path = request.getServletPath();
 		if (path.equals("/index") || path.equals("/login") || path.equals("/validatelogin")
+				|| path.equals("/tenant-b/login") || path.equals("/tenant-b/validatelogin")
 				|| path.startsWith("/css/") || path.startsWith("/images/") || path.startsWith("/fonts/")
 				|| path.equals("/css.css") || path.equals("/loginstyles.css")) {
 			return true;
 		}
 		HttpSession session = request.getSession(false);
 		if (session == null || session.getAttribute("username") == null) {
-			response.sendRedirect(request.getContextPath() + "/login");
+			String loginPath = path.startsWith("/tenant-b/") ? "/tenant-b/login" : "/login";
+			response.sendRedirect(request.getContextPath() + loginPath);
 			return false;
 		}
 		String role = (String) session.getAttribute("role");
 		if (path.equals("/staff") || path.equals("/showcust") || path.equals("/showadmin")
 				|| path.equals("/showemp") || path.equals("/addadmin") || path.equals("/addemp")
-				|| path.equals("/addcust")) {
+				|| path.equals("/addcust") || path.equals("/tenant-b/operations")
+				|| path.equals("/tenant-b/clients") || path.equals("/tenant-b/client/account")) {
 			if (!"admin".equals(role) && !"emp".equals(role)) {
 				response.sendError(HttpServletResponse.SC_FORBIDDEN, "Staff access required");
 				return false;
