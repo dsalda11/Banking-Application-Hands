@@ -64,7 +64,12 @@ export async function evaluateCheckpoint(
   try {
     switch (checkpoint.kind) {
       case 'urlMatches':
-        return base(matches(page.url(), String(value.pattern)), { url: page.url() });
+        {
+          const url = page.url();
+          const pattern = String(value.pattern);
+          const observed = pattern.startsWith('^/') ? new URL(url).pathname : url;
+          return base(matches(observed, pattern), { url, matchedValue: observed });
+        }
       case 'titleMatches':
         return base(matches(await page.title(), String(value.pattern)), {
           title: await page.title(),

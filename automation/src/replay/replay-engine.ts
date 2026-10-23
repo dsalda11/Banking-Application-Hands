@@ -25,6 +25,10 @@ import {
   type ValidationReportingCoordinator,
 } from '../intervention/intervention-coordinator.js';
 import { ControlLeaseManager, LeaseError } from '../intervention/control-lease.js';
+import { contentHash as canonicalContentHash } from '../compiler/canonical-json.js';
+import type { TenantExecutionPlan } from '../tenant/tenant-execution-plan.js';
+import { verifyTenantExecutionPlan } from '../tenant/tenant-execution-plan.js';
+import { TenantResolutionError } from '../tenant/tenant-resolver.js';
 
 export interface ReplayOptions {
   readonly loadedArtifact: LoadedArtifact;
@@ -35,6 +39,8 @@ export interface ReplayOptions {
   readonly headless: boolean;
   readonly adapter: SurfaceAdapter;
   readonly loadedPolicy: LoadedPolicy;
+  /** Optional immutable specialization of the approved base artifact. */
+  readonly tenantExecutionPlan?: TenantExecutionPlan;
   readonly logger?: Logger;
   readonly executionMode?: 'nonInteractive' | 'interactive';
   /** Test-only deterministic lease clock; production omits it and uses wall time. */
@@ -88,6 +94,15 @@ function errorDetail(error: unknown, stepId?: string) {
       message: error.message,
       retryable: false,
       evidence: [],
+    });
+  if (error instanceof TenantResolutionError)
+    return ErrorDetail.parse({
+      category: 'schema',
+      code: error.code,
+      message: error.message,
+      retryable: false,
+      evidence: [],
+      ...(stepId ? { stepId } : {}),
     });
   if (error instanceof PolicyDecisionError)
     return ErrorDetail.parse({
@@ -274,7 +289,8 @@ export class ReplayEngine {
 
   async run(options: ReplayOptions): Promise<RunResultType> {
     const runId = `replay-${randomUUID()}`;
-    const { artifact, contentHash } = options.loadedArtifact;
+    const baseArtifactHash = options.loadedArtifact.contentHash;
+    const artifact = options.tenantExecutionPlan?.artifact ?? options.loadedArtifact.artifact;
     const policyEngine = new PolicyEngine(
       options.loadedPolicy.policy,
       options.loadedPolicy.contentHash,
@@ -306,6 +322,8 @@ export class ReplayEngine {
     let lastCompletedStepId: string | undefined;
 
     try {
+      if (options.tenantExecutionPlan)
+        verifyTenantExecutionPlan(options.loadedArtifact, options.tenantExecutionPlan);
       const bindings = validateRuntimeBindings(artifact, options.inputs, options.secrets);
       const replayContext: ExecutionContext = {
         inputs: bindings.inputs,
@@ -320,6 +338,40 @@ export class ReplayEngine {
       };
       context = replayContext;
       this.assertNotCancelled(options);
+      if (options.tenantExecutionPlan) {
+        const runtimeInputsHash = canonicalContentHash(bindings.inputs);
+        const executionIdentityHash = canonicalContentHash({
+          baseArtifactHash,
+          tenantConfigurationHash: options.tenantExecutionPlan.tenantConfigurationHash,
+          effectiveConfigurationHash: options.tenantExecutionPlan.effectiveConfigurationHash,
+          effectivePlanHash: options.tenantExecutionPlan.effectivePlanHash,
+          policyHash: options.loadedPolicy.contentHash,
+          runtimeInputsHash,
+        });
+        events.push({
+          timestamp: new Date().toISOString(),
+          eventType: 'tenant_execution_plan_resolved',
+          action: 'tenant-resolution',
+          observed: {
+            tenantId: options.tenantExecutionPlan.tenantId,
+            tenantConfigurationVersion:
+              options.tenantExecutionPlan.tenantConfigurationVersion,
+            activation: options.tenantExecutionPlan.activation,
+            baseArtifactHash,
+            tenantConfigurationHash: options.tenantExecutionPlan.tenantConfigurationHash,
+            effectiveConfigurationHash:
+              options.tenantExecutionPlan.effectiveConfigurationHash,
+            effectiveArtifactHash: options.tenantExecutionPlan.effectiveArtifactHash,
+            effectivePlanHash: options.tenantExecutionPlan.effectivePlanHash,
+            policyHash: options.loadedPolicy.contentHash,
+            runtimeInputsHash,
+            executionIdentityHash,
+            modelCalls: 0,
+          },
+          reason: 'Controlled local test-fixture tenant specialization; not production-approved.',
+          ok: true,
+        });
+      }
       events.push({
         timestamp: new Date().toISOString(),
         eventType: 'policy_loaded',
@@ -427,7 +479,7 @@ export class ReplayEngine {
               runId,
               artifactId: artifact.id,
               artifactVersion: artifact.version,
-              artifactHash: contentHash,
+              artifactHash: baseArtifactHash,
               code: 'PERMISSION_DENIED',
               ...(result.outcome.stepId ? { stepId: result.outcome.stepId } : {}),
               evidence,
@@ -441,7 +493,7 @@ export class ReplayEngine {
             runId,
             artifactId: artifact.id,
             artifactVersion: artifact.version,
-            artifactHash: contentHash,
+            artifactHash: baseArtifactHash,
             code: result.outcome.code,
             evidence,
             completedAt: new Date().toISOString(),
@@ -498,7 +550,7 @@ export class ReplayEngine {
         runId,
         artifactId: artifact.id,
         artifactVersion: artifact.version,
-        artifactHash: contentHash,
+        artifactHash: baseArtifactHash,
         outputs: replayContext.outputs,
         evidence,
         completedAt: new Date().toISOString(),
@@ -602,7 +654,7 @@ export class ReplayEngine {
               runId,
               artifactId: artifact.id,
               artifactVersion: artifact.version,
-              artifactHash: contentHash,
+              artifactHash: baseArtifactHash,
               outputs: context.outputs,
               completionMode: 'human',
               evidence: [...failureEvidence, ...(trace ? [trace] : [])],
@@ -614,7 +666,7 @@ export class ReplayEngine {
                 runId,
                 artifactId: artifact.id,
                 artifactVersion: artifact.version,
-                artifactHash: contentHash,
+                artifactHash: baseArtifactHash,
                 code: 'INTERRUPTED_BY_SIGNAL',
                 signal: options.interruptionSource?.() ?? 'SIGINT',
                 evidence: [...failureEvidence, ...(trace ? [trace] : [])],
@@ -635,7 +687,7 @@ export class ReplayEngine {
                     runId,
                     artifactId: artifact.id,
                     artifactVersion: artifact.version,
-                    artifactHash: contentHash,
+                    artifactHash: baseArtifactHash,
                     code: 'ABORTED_BY_HUMAN',
                     evidence: [...failureEvidence, ...(trace ? [trace] : [])],
                     completedAt: new Date().toISOString(),
@@ -645,7 +697,7 @@ export class ReplayEngine {
                     runId,
                     artifactId: artifact.id,
                     artifactVersion: artifact.version,
-                    artifactHash: contentHash,
+                    artifactHash: baseArtifactHash,
                     error: failure,
                     evidence: [...failureEvidence, ...(trace ? [trace] : [])],
                     completedAt: new Date().toISOString(),

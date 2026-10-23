@@ -13,6 +13,7 @@
     "security:dependencies": "npm audit --audit-level=high",
     "evidence:check": "node ../scripts/evidence-check.mjs",
     "surface:smoke": "tsx src/cli/index.ts surface-smoke",
+    "surface:tenant-b": "tsx src/cli/index.ts tenant-variant-smoke",
     "proof:bank": "tsx src/cli/index.ts proof-bank",
     "artifact:list": "tsx src/cli/index.ts artifact:list",
     "artifact:validate": "tsx src/cli/index.ts artifact:validate",

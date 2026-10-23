@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "local-bank-discovery",
+  "version": "1.1.0",
+  "description": "Fail-closed local test-fixture policy for the approved banking capability across two same-vendor UI variants.",
+  "allowedOrigins": ["http://127.0.0.1:8080"],
+  "allowedRoutes": [
+    { "id": "tenant-a-login", "pattern": "^/index$" },
+    { "id": "tenant-a-staff", "pattern": "^/staff$" },
+    { "id": "tenant-a-customers", "pattern": "^/showcust$" },
+    { "id": "tenant-a-details", "pattern": "^/getDetails$" },
+    { "id": "tenant-b-login", "pattern": "^/tenant-b/login$" },
+    { "id": "tenant-b-operations", "pattern": "^/tenant-b/operations$" },
+    { "id": "tenant-b-clients", "pattern": "^/tenant-b/clients$" },
+    { "id": "tenant-b-account", "pattern": "^/tenant-b/client/account$" }
+  ],
+  "allowedActions": ["navigate", "activate", "enterText", "pressKey", "scroll", "extract"],
+  "deniedActions": ["selectOption", "wait"],
+  "riskByAction": {
+    "navigate": "navigation",
+    "activate": "read",
+    "enterText": "input",
+    "selectOption": "prohibited",
+    "pressKey": "input",
+    "scroll": "read",
+    "wait": "prohibited",
+    "extract": "read"
+  },
+  "allowedSecretReferences": ["BANK_STAFF_USERNAME", "BANK_STAFF_PASSWORD"],
+  "allowedSecretStepIds": ["step-002-enter-text", "step-003-enter-text"],
+  "screenshotRules": { "enabled": false, "forbidWhileSecretFieldPopulated": true },
+  "traceRules": { "enabled": false, "startAfterAuthentication": true },
+  "navigation": { "allowExternal": false, "maxNavigations": 10 },
+  "downloads": "deny",
+  "uploads": "deny",
+  "maxReplayDurationMs": 120000,
+  "maxActionAttempts": 1,
+  "authenticationRecovery": { "allowed": false, "maxAttempts": 1 },
+  "interventionActions": [],
+  "interventionStepIds": [],
+  "defaultDecision": "deny",
+  "metadata": { "createdAt": "2026-10-16T00:00:00Z" }
+}
