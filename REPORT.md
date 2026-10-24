@@ -85,15 +85,18 @@ web driver, an accessibility-tree driver, or a desktop automation adapter becaus
 semantic actions, targets, checkpoints, and observations rather than Playwright code. This is a
 design affordance, not a claim that desktop execution exists.
 
-Similarly, the artifact format could support vendor-level base capabilities shared by institutions,
-with tenant- and application-version-specific locator or configuration overrides. Product
-fingerprints, schema versions, capability versions, and policy references could detect incompatible
-drift; meaningful changes would require revalidation and exact-hash reapproval. Secret values would
-remain tenant runtime bindings rather than artifact fields.
+The repository now includes a narrow cross-tenant foundation. Tenant A and Tenant B are two visible
+configurations of the same Spring/JSP vendor application and reuse its services, database, and
+synthetic fixtures. Both declarative tenant documents reference the exact same approved base
+capability; Tenant B identifies its alternate routes, labels, fingerprints, and reordered table
+columns without copying the artifact. A strict resolver checks vendor/version compatibility, the
+base hash, environment-variable references, and a closed override vocabulary, then produces a
+deterministic resolved-configuration hash. It cannot add actions, policy permissions, output types,
+risk changes, or credential values.
 
-The repository does not implement tenant routing, override merging, cross-tenant canonicalization,
-remote registries, desktop adapters, or artifact migration. Those features were left out so the
-submission could prove one genuine discovery-to-replay path and its trust boundaries thoroughly.
+Applying those overrides to a live replay plan, tenant routing, remote registries, desktop adapters,
+and artifact migration are not implemented yet. Meaningful base-artifact changes would still require
+revalidation and exact-hash reapproval; runtime secret values remain outside configuration data.
 
 # 5. Escalation & handoff
 
@@ -139,8 +142,8 @@ system, and new surfaces or tenants would require fresh threat analysis.
 
 # 7. Cuts
 
-The implementation targets one legacy local web application, not desktop software. It designs seams
-for heterogeneous surfaces and multi-tenant specialization but does not build those systems. The
+The implementation targets one legacy local web product with two configured UI variants, not desktop
+software. It validates and hashes tenant specialization but does not yet apply it during replay. The
 operator UI is minimal rather than a production co-browsing console. Execution is single-process:
 there are no queues, clusters, distributed fencing, cloud registry, or scheduler. Promotion into the
 active artifact registry remains a separate human action, so the verified `1.0.2` artifact is not
@@ -151,8 +154,8 @@ the path, not a broad model benchmark. Structural locators still depend on stabl
 routes, roles, and table headers. The compiler is conservative and rejects evidence it cannot justify
 rather than attempting broad cross-application generalization.
 
-With more time, the next work would be authenticated durable handoff, an external immutable artifact
-registry with signed approvals, tenant/version overlay validation, drift monitoring and controlled
-re-discovery, and additional real surfaces and application versions. Those extensions should preserve
+With more time, the next work would integrate the validated tenant overlay with replay, then add
+authenticated durable handoff, an external immutable artifact registry with signed approvals, drift
+monitoring, controlled re-discovery, and additional real surfaces. Those extensions should preserve
 the demonstrated boundary: models may discover, but approved deterministic artifacts and policy own
 production execution.

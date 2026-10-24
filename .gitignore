@@ -1,4 +1,6 @@
 HELP.md
+/ACCEPTANCE_REPORT.md
+/ARCHITECTURE.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**
